@@ -75,5 +75,3 @@ class QueueCanvas(QWidget):
         painter.setFont(QFont("Arial", 10))
         painter.drawText(self.width() // 2 - 50, base_y + box_height + 30, f"队列容量: {self.capacity} \n当前数量: {len(self.data_items)}")
         
-        
-        

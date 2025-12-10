@@ -8,6 +8,9 @@ from src.model.exceptions import StructureFullError, StructureEmptyError
 from src.model.queue import Queue             
 from src.view.queue_canvas import QueueCanvas 
 
+from src.controller.stack_controller import StackController
+from src.controller.queue_controller import QueueController
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -77,54 +80,12 @@ class MainWindow(QMainWindow):
         control_layout.addStretch() # 弹簧，把控件顶上去
 
         # === 信号连接 ===
-        # 当按钮被点击时，执行对应的函数
-        self.btn_push.clicked.connect(self.on_push_click)
-        self.btn_pop.clicked.connect(self.on_pop_click)
+        self.stack_controller = StackController(self.stack, self.canvas,
+                                                self.stack_input_field, self.stack_status_message)
+        self.btn_push.clicked.connect(self.stack_controller.on_push_click)
+        self.btn_pop.clicked.connect(self.stack_controller.on_pop_click)
 
         return page
-
-    def on_push_click(self):
-        """处理入栈逻辑"""
-        value = self.stack_input_field.text().strip()
-        if not value:
-            #QMessageBox.warning(self, "提示", "请输入内容！")
-            # 提示用户输入为空
-            self.stack_status_message.setText("请先输入数据！")
-            self.stack_status_message.setStyleSheet("color: orange;")
-            self.stack_input_field.setFocus()
-            return
-        
-        try:
-            # 1. 修改后端数据
-            self.stack.push(value)
-            # 2. 刷新前端显示
-            self.stack_refresh_view()
-            # 3. 清空输入框
-            self.stack_input_field.clear()
-            self.stack_input_field.setFocus()
-
-            self.stack_status_message.setText(f"成功入栈元素: {value}")
-            self.stack_status_message.setStyleSheet("color: green;")
-        except StructureFullError:
-            self.stack_status_message.setText("栈满溢出 (Stack Overflow)！")
-            self.stack_status_message.setStyleSheet("color: red;")
-            self.stack_input_field.clear()
-            self.stack_input_field.setFocus()
-
-    def on_pop_click(self):
-        """处理出栈逻辑"""
-        try:
-            # 1. 修改后端数据
-            popped_val = self.stack.pop()
-            # 2. 刷新前端显示
-            self.stack_refresh_view()
-            self.stack_status_message.setText(f"成功出栈元素: {popped_val}")
-            self.stack_status_message.setStyleSheet("color: green;")
-            self.stack_input_field.setFocus()
-        except StructureEmptyError:
-            self.stack_status_message.setText("栈空下溢 (Stack Underflow)！")
-            self.stack_status_message.setStyleSheet("color: red;")
-            self.stack_input_field.setFocus()
 
     def create_queue_page(self):
         """创建队列操作页面"""
@@ -165,55 +126,11 @@ class MainWindow(QMainWindow):
         control_layout.addStretch() # 弹簧，把控件顶上去
 
         # === 信号连接 ===
-        self.btn_enqueue.clicked.connect(self.on_enqueue_click)
-        self.btn_dequeue.clicked.connect(self.on_dequeue_click)
+        self.queue_controller = QueueController(self.queue, self.queue_canvas,
+                                                self.queue_input_field, self.queue_status_message)
+        self.btn_enqueue.clicked.connect(self.queue_controller.on_enqueue_click)
+        self.btn_dequeue.clicked.connect(self.queue_controller.on_dequeue_click)
 
 
         return page
     
-    def on_enqueue_click(self):
-        """处理入队逻辑"""
-        value = self.queue_input_field.text().strip()
-        if not value:
-            self.queue_status_message.setText("请先输入数据！")
-            self.queue_status_message.setStyleSheet("color: orange;")
-            self.queue_input_field.setFocus()
-            return
-        
-        try:
-            self.queue.enqueue(value)
-            self.refresh_queue_view()
-            self.queue_input_field.clear()
-            self.queue_input_field.setFocus()
-
-            self.queue_status_message.setText(f"成功入队元素: {value}")
-            self.queue_status_message.setStyleSheet("color: green;")
-        except StructureFullError:
-            self.queue_status_message.setText("队列满溢 (Queue Overflow)！")
-            self.queue_status_message.setStyleSheet("color: red;")
-            self.queue_input_field.clear()
-            self.queue_input_field.setFocus()
-    
-    def on_dequeue_click(self):
-        """处理出队逻辑"""
-        try:
-            dequeued_val = self.queue.dequeue()
-            self.refresh_queue_view()
-            self.queue_status_message.setText(f"成功出队元素: {dequeued_val}")
-            self.queue_status_message.setStyleSheet("color: green;")
-            self.queue_input_field.setFocus()
-        except StructureEmptyError:
-            self.queue_status_message.setText("队列空下溢 (Queue Underflow)！")
-            self.queue_status_message.setStyleSheet("color: red;")
-            self.queue_input_field.setFocus()
-
-    def stack_refresh_view(self):
-        """同步栈数据"""
-        # 从模型获取最新列表，交给画布去画
-        items = self.stack.get_items()
-        self.canvas.update_data(items)
-
-    def refresh_queue_view(self):
-        """同步队列数据"""
-        items = self.queue.get_items()
-        self.queue_canvas.update_data(items)
