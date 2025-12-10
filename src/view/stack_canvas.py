@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import QWidget
 from PyQt6.QtGui import QPainter, QColor, QFont, QPen, QBrush
 from PyQt6.QtCore import Qt
 
-class DSCanvas(QWidget):
+class StackCanvas(QWidget):
     """数据结构专用画布：负责把数据画成方块"""
     def __init__(self, parent=None, capacity=10):
         super().__init__(parent)

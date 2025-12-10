@@ -36,3 +36,6 @@ class Queue:
 
     def get_items(self) -> List[Any]:
         return self._items.copy()
+    
+    def capacity(self) -> int:
+        return self._capacity
