@@ -23,7 +23,7 @@ class MainWindow(QMainWindow):
         layout = QHBoxLayout(main_widget)
 
         # === 左侧：画布区 ===
-        self.canvas = DSCanvas()
+        self.canvas = DSCanvas(capacity=self.stack.capacity())
         layout.addWidget(self.canvas, stretch=3) # 占 3/4 宽度
 
         # === 右侧：控制面板 ===

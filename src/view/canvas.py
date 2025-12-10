@@ -4,14 +4,15 @@ from PyQt6.QtCore import Qt
 
 class DSCanvas(QWidget):
     """数据结构专用画布：负责把数据画成方块"""
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, capacity=10):
         super().__init__(parent)
         self.data_items = []  # 存放要画的数据
+        self.capacity = capacity
         
-        # 设置白色背景
+        # 设置浅浅浅蓝色背景
         self.setAutoFillBackground(True)
         p = self.palette()
-        p.setColor(self.backgroundRole(), Qt.GlobalColor.white)
+        p.setColor(self.backgroundRole(), QColor(240, 248, 255))
         self.setPalette(p)
 
     def update_data(self, items: list):
@@ -20,9 +21,9 @@ class DSCanvas(QWidget):
         self.update()  # 这一步会触发 paintEvent
 
     def paintEvent(self, event):
-        """Qt 绘图核心函数，系统会自动调用"""
+        """绘制画布内容"""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing) # 抗锯齿
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing) # 图形抗锯齿
 
         # 定义方块参数
         box_width = 80
@@ -35,31 +36,27 @@ class DSCanvas(QWidget):
         for i, item in enumerate(self.data_items):
             # 计算坐标：栈底在下，新元素往上摞
             x = start_x
-            y = base_y - (i * (box_height + 5)) # 5是间距
+            y = base_y - (i * (box_height)) 
 
             # 1. 画方块背景
-            painter.setBrush(QBrush(QColor(100, 149, 237)))  # 漂亮的矢车菊蓝
-            painter.setPen(QPen(Qt.GlobalColor.black, 2))
+            painter.setBrush(QBrush(QColor(173, 216, 230)))  # 浅蓝色
+            painter.setPen(QPen(QColor(152, 180, 212), 1))  # 边框颜色
             painter.drawRect(x, y, box_width, box_height)
 
             # 2. 画文字
             painter.setPen(Qt.GlobalColor.white)
             painter.setFont(QFont("Arial", 12, QFont.Weight.Bold))
-            painter.drawText(x, y, box_width, box_height, 
-                           Qt.AlignmentFlag.AlignCenter, str(item))
+            painter.drawText(x, y, box_width, box_height, Qt.AlignmentFlag.AlignCenter, str(item))
             
-        # 3. 画一个底座（容器的感觉）
+        # 3. 画一个底座
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.setPen(QPen(Qt.GlobalColor.gray, 3))
+        painter.setPen(QPen(Qt.GlobalColor.gray, 2))
         # 画个 U 型开口
-        container_width = box_width + 20
-        container_height = (len(self.data_items) + 1) * (box_height + 5)
+        container_width = box_width + 4
+        container_height = (self.capacity * box_height+4)
         # 左竖线
-        painter.drawLine(start_x - 10, base_y + box_height, 
-                        start_x - 10, base_y - container_height)
+        painter.drawLine(start_x - 2, base_y + box_height, start_x - 2, base_y+ box_height - container_height)
         # 右竖线
-        painter.drawLine(start_x + box_width + 10, base_y + box_height, 
-                        start_x + box_width + 10, base_y - container_height)
+        painter.drawLine(start_x + box_width + 2, base_y + box_height, start_x + box_width + 2, base_y+ box_height - container_height)
         # 底横线
-        painter.drawLine(start_x - 10, base_y + box_height, 
-                        start_x + box_width + 10, base_y + box_height)
+        painter.drawLine(start_x - 2, base_y + box_height, start_x + box_width + 2, base_y + box_height)

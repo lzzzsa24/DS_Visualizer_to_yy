@@ -38,3 +38,6 @@ class Stack:
     def get_items(self) -> List[Any]:
         """获取所有元素（用于前端绘图）"""
         return self._items.copy()  # 返回副本，防止外部直接修改
+    
+    def capacity(self) -> int:
+        return self._capacity
