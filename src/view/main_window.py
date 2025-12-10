@@ -1,8 +1,10 @@
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QPushButton, QLineEdit, QMessageBox, QLabel, QGroupBox)
+from PyQt6.QtCore import Qt
 from src.view.canvas import DSCanvas
 from src.model.stack import Stack
 from src.model.exceptions import StructureFullError, StructureEmptyError
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -41,12 +43,21 @@ class MainWindow(QMainWindow):
         self.btn_push = QPushButton("入栈 (Push)")
         self.btn_pop = QPushButton("出栈 (Pop)")
         
-        # 设置一点样式
+        # 设置样式
         self.btn_push.setStyleSheet("background-color: #4CAF50; color: white; padding: 8px;")
         self.btn_pop.setStyleSheet("background-color: #F44336; color: white; padding: 8px;")
 
         control_layout.addWidget(self.btn_push)
         control_layout.addWidget(self.btn_pop)
+
+        # 状态显示标签
+        self.status_message = QLabel("准备就绪")
+        # 设置样式：居中，稍微留点上下边距
+        self.status_message.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.status_message.setStyleSheet("color: gray; font-size: 14px; margin-top: 10px;")
+        control_layout.addWidget(self.status_message)
+
+
         control_layout.addStretch() # 弹簧，把控件顶上去
 
         # === 信号连接 ===
@@ -58,7 +69,11 @@ class MainWindow(QMainWindow):
         """处理入栈逻辑"""
         value = self.input_field.text().strip()
         if not value:
-            QMessageBox.warning(self, "提示", "请输入内容！")
+            #QMessageBox.warning(self, "提示", "请输入内容！")
+            # 提示用户输入为空
+            self.status_message.setText("请先输入数据！")
+            self.status_message.setStyleSheet("color: orange;")
+            self.input_field.setFocus()
             return
         
         try:
@@ -69,8 +84,14 @@ class MainWindow(QMainWindow):
             # 3. 清空输入框
             self.input_field.clear()
             self.input_field.setFocus()
+
+            self.status_message.setText(f"成功入栈元素: {value}")
+            self.status_message.setStyleSheet("color: green;")
         except StructureFullError:
-            QMessageBox.critical(self, "错误", "栈满溢出 (Stack Overflow)！")
+            self.status_message.setText("栈满溢出 (Stack Overflow)！")
+            self.status_message.setStyleSheet("color: red;")
+            self.input_field.clear()
+            self.input_field.setFocus()
 
     def on_pop_click(self):
         """处理出栈逻辑"""
@@ -79,9 +100,12 @@ class MainWindow(QMainWindow):
             popped_val = self.stack.pop()
             # 2. 刷新前端显示
             self.refresh_view()
-            QMessageBox.information(self, "成功", f"弹出了元素: {popped_val}")
+            self.status_message.setText(f"成功出栈元素: {popped_val}")
+            self.status_message.setStyleSheet("color: green;")
         except StructureEmptyError:
-            QMessageBox.critical(self, "错误", "栈空下溢 (Stack Underflow)！")
+            self.status_message.setText("栈空下溢 (Stack Underflow)！")
+            self.status_message.setStyleSheet("color: red;")
+            self.input_field.setFocus()
 
     def refresh_view(self):
         """同步数据"""

@@ -28,7 +28,7 @@ class DSCanvas(QWidget):
         # 定义方块参数
         box_width = 80
         box_height = 40
-        start_x = 100
+        start_x = (self.width() - box_width) // 2
         # 从窗口底部往上画（模拟栈的物理堆叠）
         base_y = self.height() - 50 
 
@@ -60,3 +60,11 @@ class DSCanvas(QWidget):
         painter.drawLine(start_x + box_width + 2, base_y + box_height, start_x + box_width + 2, base_y+ box_height - container_height)
         # 底横线
         painter.drawLine(start_x - 2, base_y + box_height, start_x + box_width + 2, base_y + box_height)
+
+        #画容量显示
+        painter.setPen(QPen(Qt.GlobalColor.darkGray))
+        painter.setFont(QFont("Arial", 10))
+        text_x = start_x - 110
+        text_width = 100
+        text_y=base_y
+        painter.drawText(text_x, text_y, text_width, 40, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop, f"容量: {self.capacity}\n当前数量: {len(self.data_items)}")
