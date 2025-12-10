@@ -7,7 +7,7 @@ class QueueCanvas(QWidget):
         super().__init__(parent)
         self.data_items = []
         self.capacity = capacity
-        # 背景色可以换个稍微不同的浅色，区分不同模式
+        # 背景色
         self.setAutoFillBackground(True)
         p = self.palette()
         p.setColor(self.backgroundRole(), QColor(255, 250, 240)) # 浅米色背景
@@ -24,7 +24,7 @@ class QueueCanvas(QWidget):
         # === 1. 参数设置 ===
         box_width = 60  # 队列方块通常画小一点，防止太长
         box_height = 60
-        spacing = 5
+        spacing = 0
         
         # 计算整个队列通道的总长度
         total_width = self.capacity * (box_width + spacing)
@@ -37,16 +37,16 @@ class QueueCanvas(QWidget):
         # === 2. 画上下两条轨道 (平行线) ===
         painter.setPen(QPen(Qt.GlobalColor.gray, 3))
         # 上轨道
-        painter.drawLine(start_x - 10, base_y - 5, 
-                         start_x + total_width + 10, base_y - 5)
+        painter.drawLine(start_x -1, base_y - 2, 
+                         start_x + total_width +1, base_y - 2)
         # 下轨道
-        painter.drawLine(start_x - 10, base_y + box_height + 5, 
-                         start_x + total_width + 10, base_y + box_height + 5)
+        painter.drawLine(start_x -1, base_y + box_height + 2, 
+                         start_x + total_width +1, base_y + box_height + 2)
         
         # 画“队头”和“队尾”的文字标记
         painter.setFont(QFont("Arial", 10))
-        painter.drawText(start_x - 60, base_y + 40, "队头\n(Head)")
-        painter.drawText(start_x + total_width + 20, base_y + 40, "队尾\n(Tail)")
+        painter.drawText(start_x , base_y -20, "队头\n(Head)")
+        painter.drawText(start_x + total_width - 40, base_y -20, "队尾\n(Tail)")
 
         # === 3. 画虚线空位 (占位符) ===
         painter.setPen(QPen(QColor(200, 200, 200), 1, Qt.PenStyle.DashLine))
@@ -70,7 +70,10 @@ class QueueCanvas(QWidget):
             painter.drawText(x, base_y, box_width, box_height, 
                            Qt.AlignmentFlag.AlignCenter, str(item))
 
-        # === 5. 左上角显示容量 ===
+        # === 紧挨队列下方居中显示容量 ===
         painter.setPen(QPen(Qt.GlobalColor.darkGray))
         painter.setFont(QFont("Arial", 10))
-        painter.drawText(10, 20, f"Queue Capacity: {self.capacity} | Items: {len(self.data_items)}")
+        painter.drawText(self.width() // 2 - 50, base_y + box_height + 30, f"队列容量: {self.capacity} \n当前数量: {len(self.data_items)}")
+        
+        
+        

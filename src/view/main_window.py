@@ -19,8 +19,8 @@ class MainWindow(QMainWindow):
         self.queue = Queue(capacity=10) # 容量设为10
         
         # 初始化界面
-        self.setWindowTitle("数据结构可视化系统 - Stack")
-        self.resize(900, 600)
+        self.setWindowTitle("数据结构可视化系统")
+        self.resize(1000, 700)
         self.setup_ui()
 
     def setup_ui(self):
