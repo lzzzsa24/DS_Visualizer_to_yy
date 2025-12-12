@@ -1,5 +1,5 @@
 from typing import Any, List
-from src.model.exceptions import StructureEmptyError, StructureFullError
+from src.model.exceptions import StructureEmptyError, StructureFullError, StructureValueError
 
 class Queue:
     """队列的实现类"""
@@ -39,3 +39,9 @@ class Queue:
     
     def capacity(self) -> int:
         return self._capacity
+    
+    #修改容量
+    def set_capacity(self, new_capacity: int) -> None:
+        if new_capacity < len(self._items):
+            raise StructureValueError("New capacity cannot be less than current size")
+        self._capacity = new_capacity

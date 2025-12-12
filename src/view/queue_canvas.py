@@ -10,8 +10,13 @@ class QueueCanvas(QWidget):
         # 背景色
         self.setAutoFillBackground(True)
         p = self.palette()
-        p.setColor(self.backgroundRole(), QColor(255, 250, 240)) # 浅米色背景
+        p.setColor(self.backgroundRole(), QColor(240, 248, 255)) # 浅浅浅蓝色背景
         self.setPalette(p)
+
+    #修改容量
+    def set_capacity(self, new_capacity: int):
+        self.capacity = new_capacity
+        self.update()  # 触发重绘
 
     def update_data(self, items: list):
         self.data_items = items
@@ -35,7 +40,7 @@ class QueueCanvas(QWidget):
         base_y = (self.height() - box_height) // 2
 
         # === 2. 画上下两条轨道 (平行线) ===
-        painter.setPen(QPen(Qt.GlobalColor.gray, 3))
+        painter.setPen(QPen(Qt.GlobalColor.gray, 2))
         # 上轨道
         painter.drawLine(start_x -1, base_y - 2, 
                          start_x + total_width +1, base_y - 2)
@@ -56,10 +61,9 @@ class QueueCanvas(QWidget):
             slot_x = start_x + i * (box_width + spacing)
             painter.drawRect(slot_x, base_y, box_width, box_height)
 
-        # === 4. 画真实数据 ===
-        # 颜色换成绿色系，代表 Queue
-        painter.setBrush(QBrush(QColor(144, 238, 144))) # 浅绿色
-        painter.setPen(QPen(Qt.GlobalColor.black, 1))
+        # === 4.画真实数据 ===
+        painter.setBrush(QBrush(QColor(173, 216, 230))) # 浅蓝色
+        painter.setPen(QPen(QColor(152, 180, 212), 1))
         painter.setFont(QFont("Arial", 12, QFont.Weight.Bold))
 
         for i, item in enumerate(self.data_items):
@@ -67,6 +71,7 @@ class QueueCanvas(QWidget):
             x = start_x + i * (box_width + spacing)
             
             painter.drawRect(x, base_y, box_width, box_height)
+            painter.setPen(Qt.GlobalColor.white)
             painter.drawText(x, base_y, box_width, box_height, 
                            Qt.AlignmentFlag.AlignCenter, str(item))
 

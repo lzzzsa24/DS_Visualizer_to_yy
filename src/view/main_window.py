@@ -69,6 +69,25 @@ class MainWindow(QMainWindow):
         control_layout.addWidget(self.btn_push)
         control_layout.addWidget(self.btn_pop)
 
+        # 容量调整输入框和按钮
+        self.stack_capacity_input = QLineEdit()
+        self.stack_capacity_input.setPlaceholderText("请输入新的容量...")
+        control_layout.addWidget(QLabel("调整容量:"))
+        control_layout.addWidget(self.stack_capacity_input)
+        self.btn_set_capacity = QPushButton("设置容量")
+        control_layout.addWidget(self.btn_set_capacity)
+        #容量加减号按钮
+        self.btn_increase_capacity = QPushButton("+")
+        self.btn_decrease_capacity = QPushButton("-")
+        control_capacity_addandsubtract_layout = QHBoxLayout()
+        control_capacity_addandsubtract_layout.addWidget(self.btn_increase_capacity)
+        control_capacity_addandsubtract_layout.addWidget(self.btn_decrease_capacity)
+        control_layout.addLayout(control_capacity_addandsubtract_layout)
+        #设置容量按钮颜色
+        self.btn_set_capacity.setStyleSheet("background-color: #008CBA; color: white; padding: 8px;")
+        self.btn_increase_capacity.setStyleSheet("background-color: #10B981; color: white; padding: 8px;font-weight: bold;")
+        self.btn_decrease_capacity.setStyleSheet("background-color: #EF4444; color: white; padding: 8px;font-weight: bold;")
+
         # 状态显示标签
         self.stack_status_message = QLabel("准备就绪")
         # 设置样式：居中，稍微留点上下边距
@@ -81,9 +100,12 @@ class MainWindow(QMainWindow):
 
         # === 信号连接 ===
         self.stack_controller = StackController(self.stack, self.canvas,
-                                                self.stack_input_field, self.stack_status_message)
+                                                self.stack_input_field, self.stack_status_message, self.stack_capacity_input)
         self.btn_push.clicked.connect(self.stack_controller.on_push_click)
         self.btn_pop.clicked.connect(self.stack_controller.on_pop_click)
+        self.btn_set_capacity.clicked.connect(self.stack_controller.on_set_capacity_click)
+        self.btn_increase_capacity.clicked.connect(self.stack_controller.on_increase_capacity_click)
+        self.btn_decrease_capacity.clicked.connect(self.stack_controller.on_decrease_capacity_click)
 
         return page
 
@@ -116,6 +138,25 @@ class MainWindow(QMainWindow):
         control_layout.addWidget(self.btn_enqueue)
         control_layout.addWidget(self.btn_dequeue)
 
+        # 容量调整输入框和按钮
+        self.queue_capacity_input = QLineEdit()
+        self.queue_capacity_input.setPlaceholderText("请输入新的容量...")
+        control_layout.addWidget(QLabel("调整容量:"))
+        control_layout.addWidget(self.queue_capacity_input)
+        self.btn_set_capacity = QPushButton("设置容量")
+        control_layout.addWidget(self.btn_set_capacity)
+        #容量加减号按钮
+        self.btn_increase_capacity = QPushButton("+")
+        self.btn_decrease_capacity = QPushButton("-")
+        control_capacity_addandsubtract_layout = QHBoxLayout()
+        control_capacity_addandsubtract_layout.addWidget(self.btn_increase_capacity)
+        control_capacity_addandsubtract_layout.addWidget(self.btn_decrease_capacity)
+        control_layout.addLayout(control_capacity_addandsubtract_layout)
+        # 设置容量按钮颜色
+        self.btn_set_capacity.setStyleSheet("background-color: #008CBA; color: white; padding: 8px;")
+        self.btn_increase_capacity.setStyleSheet("background-color: #10B981; color: white; padding: 8px;font-weight: bold;")
+        self.btn_decrease_capacity.setStyleSheet("background-color: #EF4444; color: white; padding: 8px;font-weight: bold;")
+
         # 状态显示标签
         self.queue_status_message = QLabel("准备就绪")
         # 设置样式：居中，稍微留点上下边距
@@ -126,10 +167,13 @@ class MainWindow(QMainWindow):
         control_layout.addStretch() # 弹簧，把控件顶上去
 
         # === 信号连接 ===
-        self.queue_controller = QueueController(self.queue, self.queue_canvas,
-                                                self.queue_input_field, self.queue_status_message)
+        self.queue_controller = QueueController(self.queue, self.queue_canvas,self.queue_input_field, 
+                                                self.queue_status_message, self.queue_capacity_input)
         self.btn_enqueue.clicked.connect(self.queue_controller.on_enqueue_click)
         self.btn_dequeue.clicked.connect(self.queue_controller.on_dequeue_click)
+        self.btn_set_capacity.clicked.connect(self.queue_controller.on_set_capacity_click)
+        self.btn_increase_capacity.clicked.connect(self.queue_controller.on_increase_capacity_click)
+        self.btn_decrease_capacity.clicked.connect(self.queue_controller.on_decrease_capacity_click)
 
 
         return page

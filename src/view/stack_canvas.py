@@ -15,6 +15,11 @@ class StackCanvas(QWidget):
         p.setColor(self.backgroundRole(), QColor(240, 248, 255))
         self.setPalette(p)
 
+    #修改容量
+    def set_capacity(self, new_capacity: int):
+        self.capacity = new_capacity
+        self.update()  # 触发重绘
+
     def update_data(self, items: list):
         """更新数据并触发重绘"""
         self.data_items = items

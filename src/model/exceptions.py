@@ -9,3 +9,7 @@ class StructureEmptyError(DSVisualizerError):
 class StructureFullError(DSVisualizerError):
     """当数据结构已满时抛出（如果有容量限制）"""
     pass
+
+class StructureValueError(DSVisualizerError):
+    """当传入的数据不符合要求时抛出"""
+    pass

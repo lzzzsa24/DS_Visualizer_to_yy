@@ -1,18 +1,19 @@
-from PyQt6.QtWidgets import QLineEdit, QLabel
+from PyQt6.QtWidgets import QLineEdit, QLabel, QMessageBox
 from src.model.stack import Stack
 from src.view.stack_canvas import StackCanvas
-from src.model.exceptions import StructureFullError, StructureEmptyError
+from src.model.exceptions import StructureFullError, StructureEmptyError, StructureValueError
 
 
 
 
 class StackController:
     def __init__(self, stack: Stack, canvas: StackCanvas,
-                 input_field: QLineEdit, status_message: QLabel):
+                 input_field: QLineEdit, status_message: QLabel, capacity_input: QLineEdit):
         self.stack = stack
         self.canvas = canvas
         self.stack_input_field = input_field
         self.stack_status_message = status_message
+        self.stack_capacity_input = capacity_input
         # 初始化画布显示
         self.stack_refresh_view()
 
@@ -59,6 +60,63 @@ class StackController:
             self.stack_status_message.setText("栈空下溢 (Stack Underflow)！")
             self.stack_status_message.setStyleSheet("color: red;")
             self.stack_input_field.setFocus()
+
+    def on_set_capacity_click(self):
+        """处理修改栈容量逻辑"""
+        new_capacity_str = self.stack_capacity_input.text().strip()
+        if not new_capacity_str.isdigit():
+            self.stack_status_message.setText("请输入有效的容量数字！")
+            self.stack_capacity_input.clear()
+            self.stack_status_message.setStyleSheet("color: orange;")
+            self.stack_capacity_input.setFocus()
+            return
+        
+        new_capacity = int(new_capacity_str)
+        try:
+            self.stack.set_capacity(new_capacity)
+            self.canvas.set_capacity(new_capacity)
+            self.stack_refresh_view()
+            self.stack_status_message.setText(f"栈容量已设置为: {new_capacity}")
+            self.stack_status_message.setStyleSheet("color: green;")
+            self.stack_capacity_input.clear()
+            self.stack_capacity_input.setFocus()
+        except StructureValueError as e:
+            self.stack_status_message.setText(str(e))
+            self.stack_status_message.setStyleSheet("color: red;")
+            self.stack_capacity_input.setFocus()
+
+    def on_increase_capacity_click(self):
+        """处理增加栈容量逻辑"""
+        current_capacity = self.stack.capacity()
+        new_capacity = current_capacity + 1
+        self.stack.set_capacity(new_capacity)
+        self.canvas.set_capacity(new_capacity)
+        self.stack_refresh_view()
+        self.stack_status_message.setText(f"栈容量已增加到: {new_capacity}")
+        self.stack_status_message.setStyleSheet("color: green;")
+        self.stack_capacity_input.setFocus()
+
+    def on_decrease_capacity_click(self):
+        """处理减少栈容量逻辑"""
+        current_capacity = self.stack.capacity()
+        if current_capacity <= 1:
+            self.stack_status_message.setText("栈容量不能小于 1！")
+            self.stack_status_message.setStyleSheet("color: red;")
+            self.stack_capacity_input.setFocus()
+            return
+        
+        new_capacity = current_capacity - 1
+        try:
+            self.stack.set_capacity(new_capacity)
+            self.canvas.set_capacity(new_capacity)
+            self.stack_refresh_view()
+            self.stack_status_message.setText(f"栈容量已减少到: {new_capacity}")
+            self.stack_status_message.setStyleSheet("color: green;")
+            self.stack_capacity_input.setFocus()
+        except StructureValueError as e:
+            self.stack_status_message.setText(str(e))
+            self.stack_status_message.setStyleSheet("color: red;")
+            self.stack_capacity_input.setFocus()
 
     def stack_refresh_view(self):
         """刷新栈画布显示"""
