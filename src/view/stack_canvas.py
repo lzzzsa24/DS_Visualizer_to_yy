@@ -37,6 +37,14 @@ class StackCanvas(QWidget):
         # 从窗口底部往上画（模拟栈的物理堆叠）
         base_y = self.height() - 50 
 
+        #画虚线空位 (占位符)
+        painter.setPen(QPen(QColor(200, 200, 200), 1, Qt.PenStyle.DashLine))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        for i in range(self.capacity - len(self.data_items)):
+            x = start_x
+            y = base_y - ((len(self.data_items) + i) * box_height)
+            painter.drawRect(x, y, box_width, box_height)
+
         # 遍历数据画图
         for i, item in enumerate(self.data_items):
             # 计算坐标：栈底在下，新元素往上摞

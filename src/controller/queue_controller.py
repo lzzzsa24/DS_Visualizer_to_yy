@@ -55,6 +55,7 @@ class QueueController:
         except StructureEmptyError:
             self.status_message.setText("队列空下溢 (Queue Underflow)！")
             self.status_message.setStyleSheet("color: red;")
+            self.input_field.setFocus()
 
     def on_set_capacity_click(self):
         """处理修改队列容量逻辑"""
@@ -100,7 +101,6 @@ class QueueController:
         if current_capacity <= 1:
             self.status_message.setText("队列容量不能小于 1！")
             self.status_message.setStyleSheet("color: red;")
-            self.input_field.setFocus()
             return
         
         new_capacity = current_capacity - 1

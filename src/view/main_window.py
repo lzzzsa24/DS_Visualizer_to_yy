@@ -85,8 +85,8 @@ class MainWindow(QMainWindow):
         control_layout.addLayout(control_capacity_addandsubtract_layout)
         #设置容量按钮颜色
         self.btn_set_capacity.setStyleSheet("background-color: #008CBA; color: white; padding: 8px;")
-        self.btn_increase_capacity.setStyleSheet("background-color: #10B981; color: white; padding: 8px;font-weight: bold;")
-        self.btn_decrease_capacity.setStyleSheet("background-color: #EF4444; color: white; padding: 8px;font-weight: bold;")
+        self.btn_increase_capacity.setStyleSheet("background-color: #10B981; color: white; padding: 3px;font-weight: bold;font-size: 20px;")
+        self.btn_decrease_capacity.setStyleSheet("background-color: #EF4444; color: white; padding: 3px;font-weight: bold;font-size: 20px;")
 
         # 状态显示标签
         self.stack_status_message = QLabel("准备就绪")
@@ -154,8 +154,8 @@ class MainWindow(QMainWindow):
         control_layout.addLayout(control_capacity_addandsubtract_layout)
         # 设置容量按钮颜色
         self.btn_set_capacity.setStyleSheet("background-color: #008CBA; color: white; padding: 8px;")
-        self.btn_increase_capacity.setStyleSheet("background-color: #10B981; color: white; padding: 8px;font-weight: bold;")
-        self.btn_decrease_capacity.setStyleSheet("background-color: #EF4444; color: white; padding: 8px;font-weight: bold;")
+        self.btn_increase_capacity.setStyleSheet("background-color: #10B981; color: white; padding: 3px;font-weight: bold;font-size: 20px;")
+        self.btn_decrease_capacity.setStyleSheet("background-color: #EF4444; color: white; padding: 3px;font-weight: bold;font-size: 20px;")
 
         # 状态显示标签
         self.queue_status_message = QLabel("准备就绪")
