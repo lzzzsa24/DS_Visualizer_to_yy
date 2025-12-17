@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QGraphicsView, QGraphicsScene, QGraphicsRectItem, QLabel,QGraphicsTextItem
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QBrush, QColor, QKeyEvent, QFont
+from PyQt6.QtGui import QBrush, QColor, QKeyEvent, QFont, QPen
 
 class GameView(QWidget):
     # 定义信号
@@ -25,23 +25,20 @@ class GameView(QWidget):
         self.cell_size = 40 # 像素大小
 
         #HUD:左上角背包显示
-        self.backpack_label = QLabel(self.view)
-        self.backpack_label.move(10, 10)  # 设置位置在左上角
-        self.backpack_label.setStyleSheet("""
-            QLabel {
-                background-color: rgba(0, 0, 0, 160);
-                color: white;
-                border-radius: 8px;
-                padding: 8px;
-                font-family: "SimHei";
-                font-size: 14px;
-                border: 1px solid #444;
-            }
-        """)
-        self.backpack_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self.backpack_label.hide()
+        self.backpack_capacity = 3
+        self.backpack_scene = QGraphicsScene()
+        self.backpack_view = QGraphicsView(self.backpack_scene, self.view)
+        #背包位置和样式
+        self.backpack_view.scale(0.8,0.8) #缩放比例
+        self.backpack_view.move(0,0)
+        self.backpack_view.setStyleSheet("background: transparent; border: none;")
+        self.backpack_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.backpack_view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.backpack_view.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        #初始化背包大小
+        self.backpack_dimensions()
 
-        #HUD:右下角提示栏
+        #HUD:中间上方提示栏
         self.info_label = QLabel(self.view)
         self.info_label.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         self.info_label.setStyleSheet("""
@@ -63,32 +60,74 @@ class GameView(QWidget):
         self.info_label.adjustSize()
         # 初始居中
         self.info_label.move((self.view.width() - self.info_label.width()) // 2,0)
+
+    def backpack_dimensions(self):
+        """根据背包容量调整背包 HUD 的尺寸"""
+        self.slot_width = 50
+        self.slot_height=50
+        self.backpack_height = self.backpack_capacity * 50 + 40 # 每个物品40px，高度加点边距
+        self.backpack_width= self.slot_width + 40
+        self.backpack_view.setFixedSize(self.backpack_width, self.backpack_height)
+        
         
     def update_backpack(self, items):
-        """更新左上角背包 HUD"""
-        if not items:
-            self.backpack_label.setText("🎒 背包 (空)")
-            self.backpack_label.adjustSize()
-            self.backpack_label.show()
-            return
+        """绘制悬浮背包"""
+        self.backpack_scene.clear()
+        
+        self.backpack_dimensions()
+        
+        capacity = self.backpack_capacity
+        slot_w = self.slot_width
+        slot_h = self.slot_height
+        
+        start_x = 10
+        start_y = 60
+        
+        # 绘制标题
+        title = QGraphicsTextItem("🎒背包")
+        title.setFont(QFont("SimHei", 16, QFont.Weight.Bold))
+        title.setDefaultTextColor(QColor("white"))
+        # 居中标题
+        t_rect = title.boundingRect()
+        title.setPos(start_x + (slot_w - t_rect.width())/2, 10) # y=10
+        self.backpack_scene.addItem(title)
 
+        # 1. 绘制空槽位
+        pen = QPen(QColor("#95a5a6"))
+        pen.setWidth(3)
+        brush = QBrush(QColor(0, 0, 0, 150)) 
+
+        for i in range(capacity):
+            y = start_y + i * slot_h
+            self.backpack_scene.addRect(start_x, y, slot_w, slot_h, pen, brush)
+
+        # 2. 绘制物品
         item_style = {
-            3: ("药", "#2ecc71"), 
+            3: ("水", "#2ecc71"), 
             4: ("剑", "#3498db"), 
             5: ("匙", "#f1c40f") 
         }
+        font = QFont("SimHei", 24)
+        font.setBold(True)
 
-        html = "<div>🎒 <b>我的背包</b></div><hr style='background-color:#555; height:1px; border:none;'>"
-        for item_id in reversed(items):
+        for i, item_id in enumerate(items):
+            if i >= capacity: break
+            
+            # 栈底在最下面 (row_index 最大)
+            row_index = capacity - 1 - i
+            current_y = start_y + row_index * slot_h
+            
             if item_id in item_style:
-                name, color = item_style[item_id]
-                html += f"<div style='color:{color}; margin-top:2px;'>█ {name}</div>"
-            else:
-                html += "<div>? 未知</div>"
-        
-        self.backpack_label.setText(html)
-        self.backpack_label.adjustSize()
-        self.backpack_label.show()
+                char, color = item_style[item_id]
+                text_item = QGraphicsTextItem(char)
+                text_item.setFont(font)
+                text_item.setDefaultTextColor(QColor(color))
+                self.backpack_scene.addItem(text_item)
+                
+                rect = text_item.boundingRect()
+                text_x = start_x + (slot_w - rect.width()) / 2
+                text_y = current_y + (slot_h - rect.height()) / 2
+                text_item.setPos(text_x, text_y)
 
             
     def render(self, grid, player_pos, msg):
@@ -110,7 +149,7 @@ class GameView(QWidget):
             0: ("·", "#404040"),  # 空地 (用点表示，更有网格感)
             1: ("墙", "#7f8c8d"),  # 墙壁 - 灰色
             2: ("我", "#e74c3c"),  # 玩家 - 红色
-            3: ("药", "#2ecc71"),  # 药水 - 绿色
+            3: ("水", "#2ecc71"),  # 水 - 绿色
             4: ("剑", "#3498db"),  # 宝剑 - 蓝色
             5: ("匙", "#f1c40f"),  # 钥匙 - 金色
             6: ("火", "#e67e22"),  # 火焰 - 橙色
@@ -118,8 +157,7 @@ class GameView(QWidget):
             8: ("门", "#ecf0f1")   # 大门 - 白色
         }
 
-        # 3. 设置字体 (使用黑体 SimHei 或 微软雅黑，加粗)
-        # 字体大小设为格子大小的 80% 左右
+        # 3. 设置字体 
         font = QFont("SimHei", int(self.cell_size * 0.6))
         font.setBold(True)
 
@@ -174,3 +212,9 @@ class GameView(QWidget):
     def keyPressEvent(self, event: QKeyEvent):
         """捕获键盘，直接转发给 Controller"""
         self.key_pressed_signal.emit(event.key())
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        center_x = (self.view.width() - self.info_label.width()) // 2
+        self.info_label.move(center_x, 0) 
+            

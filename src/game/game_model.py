@@ -7,11 +7,11 @@ class GameModel:
         self.backpack = Stack(capacity=5)
         
         # 2. 游戏消息 (用于显示在界面上)
-        self.message = "Welcome to Legends of Stack! Use WASD to move."
+        self.message = "欢迎来到栈之传说 - 按 WASD 移动"
         
         # 3. 地图定义
         # 0=空地, 1=墙, 2=玩家
-        # 3=药水, 4=剑, 5=钥匙 (道具-入栈)
+        # 3=水, 4=剑, 5=钥匙 (道具-入栈)
         # 6=火, 7=怪, 8=门 (障碍-需出栈)
         self.grid_width = 10
         self.grid_height = 10

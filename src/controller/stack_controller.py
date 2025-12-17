@@ -32,8 +32,8 @@ class StackController:
         self.pop_sound.setSource(QUrl.fromLocalFile(pop_sound_path))
         self.error_sound.setSource(QUrl.fromLocalFile(error_sound_path))
         self.done_sound.setSource(QUrl.fromLocalFile(done_sound_path))
-        self.push_sound.setVolume(0.5)  # 设置音量，范围0.0到1.0
-        self.pop_sound.setVolume(1.0)
+        self.push_sound.setVolume(0.5)  # 设置音量
+        self.pop_sound.setVolume(4.0)
         self.error_sound.setVolume(0.3)
         self.done_sound.setVolume(0.5)
 
@@ -146,12 +146,10 @@ class StackController:
             self.stack_refresh_view()
             self.stack_status_message.setText(f"栈容量已减少到: {new_capacity}")
             self.stack_status_message.setStyleSheet("color: green;")
-            self.stack_capacity_input.setFocus()
             self.done_sound.play()
         except StructureValueError as e:
             self.stack_status_message.setText(str(e))
             self.stack_status_message.setStyleSheet("color: red;")
-            self.stack_capacity_input.setFocus()
             self.error_sound.play()
 
     def stack_refresh_view(self):

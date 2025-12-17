@@ -29,8 +29,8 @@ class QueueController:
         self.dequeue_sound.setSource(QUrl.fromLocalFile(dequeue_sound_path))
         self.error_sound.setSource(QUrl.fromLocalFile(error_sound_path))
         self.done_sound.setSource(QUrl.fromLocalFile(done_sound_path))
-        self.enqueue_sound.setVolume(0.5)  # 设置音量，范围0.0到1.0
-        self.dequeue_sound.setVolume(1.0)
+        self.enqueue_sound.setVolume(0.5)  # 设置音量
+        self.dequeue_sound.setVolume(4.0)
         self.error_sound.setVolume(0.3)
         self.done_sound.setVolume(0.5)
 
@@ -142,12 +142,10 @@ class QueueController:
             self.queue_refresh_view()
             self.status_message.setText(f"队列容量已减少到: {new_capacity}")
             self.status_message.setStyleSheet("color: green;")
-            self.input_field.setFocus()
             self.done_sound.play()
         except StructureValueError as e:
             self.status_message.setText(str(e))
             self.status_message.setStyleSheet("color: red;")
-            self.input_field.setFocus()
             self.error_sound.play()
 
     def queue_refresh_view(self):
