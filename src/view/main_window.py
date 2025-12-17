@@ -2,6 +2,7 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTa
                              QPushButton, QLineEdit, QMessageBox, QLabel, QGroupBox)
 from PyQt6.QtCore import Qt
 from src.view.stack_canvas import StackCanvas
+
 from src.model.stack import Stack
 from src.model.exceptions import StructureFullError, StructureEmptyError
 
@@ -10,6 +11,9 @@ from src.view.queue_canvas import QueueCanvas
 
 from src.controller.stack_controller import StackController
 from src.controller.queue_controller import QueueController
+
+from src.game.game_view import GameView       
+from src.game.game_controller import GameController 
 
 
 class MainWindow(QMainWindow):
@@ -37,7 +41,11 @@ class MainWindow(QMainWindow):
         #创建queue标签页
         self.queue_widget = self.create_queue_page()
         self.tabs.addTab(self.queue_widget, "队列 (Queue)")
-
+        #创建game标签页
+        self.game_widget = self.create_game_page()
+        self.tabs.addTab(self.game_widget, "栈之传说 (Legends of Stack)")
+        self.game_widget.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # 允许接收键盘焦点
+        
         
     def create_stack_page(self):
         """创建栈操作页面"""
@@ -177,4 +185,14 @@ class MainWindow(QMainWindow):
 
 
         return page
+    
+    def create_game_page(self):
+        """创建游戏页面"""
+       
+        # 创建游戏视图
+        view = GameView()
+        # 创建游戏控制器
+        self.game_controller = GameController(view)
+
+        return view
     
