@@ -33,6 +33,11 @@ class MainWindow(QMainWindow):
     def setup_ui(self):
         # 主容器
         self.tabs=QTabWidget()
+        self.tabs.setStyleSheet("""
+            QTabWidget::pane {
+                border: 0;
+            }
+        """)
         self.setCentralWidget(self.tabs)
 
         #创建stack标签页

@@ -35,3 +35,6 @@ class GameController(QObject):
             player_pos=(self.model.player_x, self.model.player_y),
             msg=self.model.message
         )
+        #刷新背包
+        backpack_items = self.model.backpack.get_items()
+        self.view.update_backpack(backpack_items)
