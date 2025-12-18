@@ -21,10 +21,15 @@ class QueueController:
         self.dequeue_sound = QSoundEffect()
         self.error_sound = QSoundEffect()
         self.done_sound = QSoundEffect()
-        enqueue_sound_path = os.path.join(os.path.dirname(__file__), '..', 'resources', 'sounds', 'add_element_successfully.wav')
-        dequeue_sound_path = os.path.join(os.path.dirname(__file__), '..', 'resources', 'sounds', 'remove_element_successfully.wav')
-        error_sound_path = os.path.join(os.path.dirname(__file__), '..', 'resources', 'sounds', 'error.wav')
-        done_sound_path = os.path.join(os.path.dirname(__file__), '..', 'resources', 'sounds', 'done.wav')
+
+        current_dir = os.path.dirname(os.path.abspath(__file__)) # 获取当前文件所在目录
+        project_root = os.path.dirname(os.path.dirname(current_dir)) # 往上跳两级：src -> 根目录
+        sounds_dir = os.path.join(project_root, 'resources', 'sounds')
+        
+        enqueue_sound_path = os.path.join(sounds_dir, 'add_element_successfully.wav')
+        dequeue_sound_path = os.path.join(sounds_dir, 'remove_element_successfully.wav')
+        error_sound_path = os.path.join(sounds_dir, 'error.wav')
+        done_sound_path = os.path.join(sounds_dir, 'done.wav')
         self.enqueue_sound.setSource(QUrl.fromLocalFile(enqueue_sound_path))
         self.dequeue_sound.setSource(QUrl.fromLocalFile(dequeue_sound_path))
         self.error_sound.setSource(QUrl.fromLocalFile(error_sound_path))

@@ -24,10 +24,15 @@ class StackController:
         self.pop_sound = QSoundEffect()
         self.error_sound = QSoundEffect()
         self.done_sound = QSoundEffect()
-        push_sound_path = os.path.join(os.path.dirname(__file__), '..', 'resources', 'sounds', 'add_element_successfully.wav')
-        pop_sound_path = os.path.join(os.path.dirname(__file__), '..', 'resources', 'sounds', 'remove_element_successfully.wav')
-        error_sound_path = os.path.join(os.path.dirname(__file__), '..', 'resources', 'sounds', 'error.wav')
-        done_sound_path = os.path.join(os.path.dirname(__file__), '..', 'resources', 'sounds', 'done.wav')
+
+        current_dir = os.path.dirname(os.path.abspath(__file__)) # 获取当前文件所在目录
+        project_root = os.path.dirname(os.path.dirname(current_dir)) # 往上跳两级：src -> 根目录
+        sounds_dir = os.path.join(project_root, 'resources', 'sounds')
+
+        push_sound_path = os.path.join(sounds_dir, 'add_element_successfully.wav')
+        pop_sound_path = os.path.join(sounds_dir, 'remove_element_successfully.wav')
+        error_sound_path = os.path.join(sounds_dir, 'error.wav')
+        done_sound_path = os.path.join(sounds_dir, 'done.wav')
         self.push_sound.setSource(QUrl.fromLocalFile(push_sound_path))
         self.pop_sound.setSource(QUrl.fromLocalFile(pop_sound_path))
         self.error_sound.setSource(QUrl.fromLocalFile(error_sound_path))
