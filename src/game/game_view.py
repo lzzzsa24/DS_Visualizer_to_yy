@@ -70,10 +70,10 @@ class GameView(QWidget):
         self.backpack_view.setFixedSize(self.backpack_width, self.backpack_height)
         
         
-    def update_backpack(self, items):
+    def update_backpack(self, items,capacity=None):
         """绘制悬浮背包"""
         self.backpack_scene.clear()
-        
+        self.backpack_capacity = capacity if capacity is not None else self.backpack_capacity
         self.backpack_dimensions()
         
         capacity = self.backpack_capacity

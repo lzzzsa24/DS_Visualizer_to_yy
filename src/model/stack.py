@@ -47,3 +47,7 @@ class Stack:
         if new_capacity < len(self._items):
             raise StructureValueError("New capacity cannot be less than current size")
         self._capacity = new_capacity
+
+    def clear(self) -> None:
+        """清空栈"""
+        self._items.clear()
