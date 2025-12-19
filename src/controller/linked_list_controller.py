@@ -49,8 +49,8 @@ class LinkedListController:
         old_size = self.linked_list.size()
         self.linked_list.append(value)
         self.refresh_view()
-        # 触发尾部插入动画
-        self.canvas.animate_insert(old_size)
+        # 触发尾部插入滑动动画
+        self.canvas.animate_insert_slide(old_size)
         self._on_success(f"尾部添加: {value}", self.add_sound)
 
     def on_prepend_click(self):
@@ -62,8 +62,8 @@ class LinkedListController:
         
         self.linked_list.prepend(value)
         self.refresh_view()
-        # 触发头部插入动画
-        self.canvas.animate_insert(0)
+        # 触发头部插入滑动动画
+        self.canvas.animate_insert_slide(0)
         self._on_success(f"头部添加: {value}", self.add_sound)
 
     def on_delete_click(self):
@@ -100,7 +100,8 @@ class LinkedListController:
         success = self.linked_list.delete(value)
         if success:
             self.refresh_view()
-            self.canvas.animate_delete(index)
+            # 删除后触发向左合拢动画
+            self.canvas.animate_delete_slide(index)
             self._on_success(f"成功删除: {value}", self.remove_sound)
 
     def on_insert_at_click(self):
@@ -123,8 +124,8 @@ class LinkedListController:
             position = int(position_text)
             self.linked_list.insert_at(position, value)
             self.refresh_view()
-            # 触发插入动画
-            self.canvas.animate_insert(position)
+            # 触发插入滑动动画
+            self.canvas.animate_insert_slide(position)
             self._on_success(f"在位置 {position} 插入: {value}", self.add_sound)
             if self.position_input:
                 self.position_input.clear()
@@ -137,6 +138,9 @@ class LinkedListController:
         """头部删除"""
         try:
             deleted_value = self.linked_list.delete_head()
+            self.refresh_view()
+            # 头部删除后触发向左合拢动画（从0开始）
+            self.canvas.animate_delete_slide(0)
             self._on_success(f"头部删除: {deleted_value}", self.remove_sound)
         except StructureEmptyError:
             self._show_error("链表为空！")
@@ -144,7 +148,11 @@ class LinkedListController:
     def on_delete_tail_click(self):
         """尾部删除"""
         try:
+            tail_index = max(0, self.linked_list.size() - 1)
             deleted_value = self.linked_list.delete_tail()
+            self.refresh_view()
+            # 尾部删除触发轻微动画以保持一致性
+            self.canvas.animate_delete_slide(tail_index)
             self._on_success(f"尾部删除: {deleted_value}", self.remove_sound)
         except StructureEmptyError:
             self._show_error("链表为空！")
@@ -176,6 +184,8 @@ class LinkedListController:
         try:
             deleted_value = self.linked_list.delete_at(position)
             self.refresh_view()
+            # 指定位置删除后触发向左合拢动画
+            self.canvas.animate_delete_slide(position)
             self.status_message.setText(f"位置 {position} 删除: {deleted_value}")
             self.status_message.setStyleSheet("color: green;")
             self.remove_sound.play()
