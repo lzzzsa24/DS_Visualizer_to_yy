@@ -17,7 +17,7 @@ class GameModel:
         ]
         self.current_level_index = 0
         # 玩家背包 
-        self.backpack = Stack(capacity=2)
+        self.backpack = Stack(capacity=3)
         # 游戏消息 (用于显示在界面上)
         self.message = "欢迎来到栈之传说 - 按 WASD 移动"
         # 地图定义
@@ -29,8 +29,12 @@ class GameModel:
         
         self.load_level(self.current_level_index)
 
+        #游戏状态
+        self.is_game_over = False
+
     def load_level(self, level_index):
         """从文件加载关卡"""
+        self.is_game_over = False
         if level_index >= len(self.level_files):
             self.message = " 恭喜！你已通过所有关卡！"
             return MapLoadError 
@@ -75,7 +79,8 @@ class GameModel:
         self.grid_height = len(self.grid)
         self.grid_width = len(self.grid[0]) if self.grid_height > 0 else 0
         
-        # 每次进新关卡，背包保留
+        # 每次进新关卡，背包清空
+        self.backpack.clear()
         self.message = f"第 {level_index + 1} 关：开始冒险！"
         return True
     

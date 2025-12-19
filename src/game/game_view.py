@@ -1,5 +1,6 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QGraphicsView, QGraphicsScene, QGraphicsRectItem, QLabel,QGraphicsTextItem
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QGraphicsView, QGraphicsScene, QGraphicsRectItem, 
+                             QLabel,QGraphicsTextItem, QPushButton, QHBoxLayout,QFrame)
+from PyQt6.QtCore import Qt, pyqtSignal, QRectF, QSize
 from PyQt6.QtGui import QBrush, QColor, QKeyEvent, QFont, QPen
 
 class GameView(QWidget):
@@ -20,6 +21,9 @@ class GameView(QWidget):
         self.view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.view.setStyleSheet("background-color: #202020;border: none;")
         self.layout.addWidget(self.view)
+
+        # 复活覆盖层
+        self.game_over_overlay = GameOverOverlay(self)
 
         
         self.cell_size = 40 # 像素大小
@@ -213,8 +217,112 @@ class GameView(QWidget):
         """捕获键盘，直接转发给 Controller"""
         self.key_pressed_signal.emit(event.key())
 
+    def show_game_over(self):
+        """显示复活界面"""
+        # 确保它覆盖整个视图区域
+        self.game_over_overlay.resize(self.size())
+        self.game_over_overlay.show()
+        # 确保它在最上层
+        self.game_over_overlay.raise_()
+
+    def hide_game_over(self):
+        """隐藏复活界面"""
+        self.game_over_overlay.hide()
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         center_x = (self.view.width() - self.info_label.width()) // 2
         self.info_label.move(center_x, 0) 
+        if hasattr(self, 'game_over_overlay'):
+            self.game_over_overlay.resize(self.size())
+
+
             
+#复活界面类
+class GameOverOverlay(QFrame):
+    # 定义两个信号，告诉 Controller 用户点了什么
+    retry_signal = pyqtSignal()
+    quit_signal = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        # 半透明白色背景
+        self.setStyleSheet("background-color: rgba(255,255,255, 120);")
+        
+        # 主布局（垂直居中）
+        main_layout = QVBoxLayout()
+        main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        main_layout.setSpacing(80)
+
+        # 1. 大标题 "YOU DIED"
+        title_label = QLabel(" YOU DIED ")
+        title_label.setStyleSheet("""
+            background-color: transparent;
+            color: #e74c3c;
+            font-family: "SimHei";
+            font-size: 128px;
+            font-weight: bold;
+            margin-bottom: 30px;
+        """)
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        # 2. 按钮容器（水平布局）
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(20)
+
+        # 1. 复活按钮 (红色线框)
+        retry_style = """
+            QPushButton {
+                background-color: #f8d7da;   /*浅红色背景*/
+                color: #e74c3c;              /* 与标题同色 */
+                font-family: "SimHei"; font-size: 20px; font-weight: 900;
+                padding: 10px 30px; 
+                border-radius: 20px;         /* 大圆角，胶囊型 */
+                border: 3px solid #e74c3c;   /* 粗边框 */
+            }
+            QPushButton:hover { 
+                background-color: #e74c3c;   /* 悬停填满红色 */
+                color: white;                /* 文字变白 */
+            }
+        """
+
+        # 2. 退出按钮 (灰色线框)
+        quit_style = """
+            QPushButton {
+                background-color: #ecf0f1; /* 浅灰色背景 */
+                color: #7f8c8d;
+                font-family: "SimHei"; font-size: 20px; font-weight: 900;
+                padding: 10px 30px; 
+                border-radius: 20px;
+                border: 3px solid #7f8c8d;
+            }
+            QPushButton:hover { 
+                background-color: #7f8c8d;
+                color: white;
+            }
+        """
+        
+        # 复活按钮
+        self.btn_retry = QPushButton("复活 (Retry)")
+        self.btn_retry.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_retry.setStyleSheet(retry_style)
+        # 连接信号
+        self.btn_retry.clicked.connect(self.retry_signal.emit)
+
+        # 退出按钮
+        self.btn_quit = QPushButton("退出 (Quit)")
+        self.btn_quit.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_quit.setStyleSheet(quit_style)
+        # 连接信号
+        self.btn_quit.clicked.connect(self.quit_signal.emit)
+        
+        button_layout.addWidget(self.btn_retry)
+        button_layout.addWidget(self.btn_quit)
+
+        main_layout.addWidget(title_label)
+        main_layout.addLayout(button_layout)
+        self.setLayout(main_layout)
+        
+        # 默认隐藏
+        self.hide()

@@ -1,7 +1,7 @@
 from PyQt6.QtCore import Qt, QObject
 from src.game.game_model import GameModel
 from src.game.game_view import GameView
-from src.model.exceptions import StructureFullError
+from src.model.exceptions import StructureFullError,StructureEmptyError
 
 class GameController(QObject):
     def __init__(self, view: GameView):
@@ -9,13 +9,41 @@ class GameController(QObject):
         self.view = view
         self.model = GameModel() 
 
-        # 连接信号
+        # 连接键盘信号
         self.view.key_pressed_signal.connect(self.handle_input)
+
+        # 连接复活信号
+        self.view.game_over_overlay.retry_signal.connect(self.reset_game)
+        self.view.game_over_overlay.quit_signal.connect(self.quit_game)
         
         # 初始刷新
         self.refresh_view()
+        
+    def reset_game(self):
+        """复活：重置当前关卡"""
+        self.model.reset_current_level()
+        # 隐藏复活覆盖层
+        self.view.hide_game_over()
+        self.refresh_view()
+
+    def quit_game(self):
+        """退出游戏"""
+        import sys
+        sys.exit(0)
+
+    def trigger_death(self,death_message):
+        """玩家死亡时调用"""
+        self.model.is_game_over = True
+        self.model.message = death_message
+        self.refresh_view()
+         # 显示复活覆盖层
+        self.view.show_game_over()
 
     def handle_input(self, key_code):
+        """处理玩家输入的移动指令"""
+        if self.model.is_game_over:
+            return
+
         dx, dy = 0, 0
         if key_code == Qt.Key.Key_W: dy = -1
         elif key_code == Qt.Key.Key_S: dy = 1
@@ -23,6 +51,12 @@ class GameController(QObject):
         elif key_code == Qt.Key.Key_D: dx = 1
         
         if dx == 0 and dy == 0: return
+
+        top_item = None 
+        try:
+            top_item = self.model.backpack.peek()
+        except StructureEmptyError:
+            top_item = None # 如果栈空了，就把栈顶当做 None
 
         # 下一步的位置
         target_x = self.model.player_x + dx
@@ -46,7 +80,7 @@ class GameController(QObject):
 
         # Case 2:  门 (8) -> 通关判定
         elif target_val == 8:
-            if self.model.backpack.peek()==5:  # 需要 Key (5)
+            if top_item == 5:  # 需要 Key (5)
                 self.model.message = " 门打开了！下一层..."
                 self.model.backpack.pop()
                 if not self.model.next_level():
@@ -55,26 +89,24 @@ class GameController(QObject):
                 self.model.message = " 门锁着，你需要钥匙！"
         # Case 3:  怪物 (7) -> 战斗判定
         elif target_val == 7:
-            if self.model.backpack.peek()==4:  # 需要 Sword (4)
+            if top_item == 4:  # 需要 Sword (4)
                 self.model.message = " 你挥舞宝剑，击败了怪物！"
                 self.model.grid[target_y][target_x] = 0 # 怪物消失
                 self.model.move_player(dx, dy)
                 self.model.backpack.pop() 
             else:
-                self.model.message = " 你被怪物吃掉了！(缺少剑)"
-                self.model.reset_current_level() # 死亡重置
+                self.trigger_death(" 你被怪物吃掉了！")
 
         # Case 4:  火焰 (6) -> 消耗品判定
         elif target_val == 6:
             # 栈的特性：我们要找水，而且通常要消耗水
-            if self.model.backpack.peek()==3:  # 需要 Water (3)
+            if top_item == 3:  # 需要 Water (3)
                 self.model.message = " 你用水浇灭了火焰！"
                 self.model.grid[target_y][target_x] = 0 # 火消失
                 self.model.move_player(dx, dy)
                 self.model.backpack.pop() 
             else:
-                self.model.message = " 你被烧焦了！(缺少水)"
-                self.model.reset_current_level()
+                self.trigger_death(" 你被烧焦了！")
 
         # Case 5:  道具 (3水, 4剑, 5匙) -> 拾取逻辑
         elif target_val in [3, 4, 5]:
