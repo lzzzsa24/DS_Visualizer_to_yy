@@ -20,6 +20,7 @@ class GameView(QWidget):
         self.view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.view.setStyleSheet("background-color: #202020;border: none;")
+        self.view.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.layout.addWidget(self.view)
 
         # 复活覆盖层
@@ -168,6 +169,8 @@ class GameView(QWidget):
         # 4. 遍历地图并绘制
         for y, row in enumerate(grid):
             for x, val in enumerate(row):
+                if val == -1:
+                    continue  # 跳过虚空区域
                 
                 # 获取该位置的皮肤，如果没有定义就跳过
                 if val in skin_map:
@@ -212,6 +215,24 @@ class GameView(QWidget):
             (px * self.cell_size) + (self.cell_size - rect.width()) / 2,
             (py * self.cell_size) + (self.cell_size - rect.height()) / 2
         )
+
+        #地图尺寸
+        map_height_rows = len(grid)
+        map_width_cols = len(grid[0]) if map_height_rows > 0 else 0
+        map_pixel_width = map_width_cols * self.cell_size
+        map_pixel_height = map_height_rows * self.cell_size
+        #设定场景边界
+        self.scene.setSceneRect(0, 0, map_pixel_width, map_pixel_height)
+        #窗口尺寸
+        view_w = self.view.viewport().width()
+        view_h = self.view.viewport().height()
+
+        if map_pixel_width > view_w or map_pixel_height > view_h:
+            # 地图很大，开启跟随模式
+            self.view.centerOn(player_item)
+        else:
+            # 地图较小，居中显示
+            pass
 
     def keyPressEvent(self, event: QKeyEvent):
         """捕获键盘，直接转发给 Controller"""

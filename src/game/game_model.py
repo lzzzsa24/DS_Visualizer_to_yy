@@ -32,6 +32,7 @@ class GameModel:
         #游戏状态
         self.is_game_over = False
 
+      
     def load_level(self, level_index):
         """从文件加载关卡"""
         self.is_game_over = False
@@ -53,7 +54,7 @@ class GameModel:
         char_map = {
             '#': 1, '.': 0, 'P': 0, # P也是空地，但记录坐标
             'K': 5, 'D': 8,'M': 7, 'F': 6,
-            'S': 4, 'W': 3
+            'S': 4, 'W': 3,' ': -1
         }
 
         new_grid = []
@@ -61,17 +62,30 @@ class GameModel:
         # 读取文件
         with open(full_path, 'r', encoding='utf-8') as f:
             lines = f.readlines()
+            
+            # 1. 预处理：去掉换行符
+            lines = [line.rstrip('\n') for line in lines]
+            
+            # 2. 找最大宽度 (为了把矩阵补齐)
+            max_width = 0
+            if lines:
+                max_width = max(len(line) for line in lines)
+            
+            # 3. 解析每一行
             for y, line in enumerate(lines):
                 row_data = []
-                line = line.strip() # 去掉换行符
-                for x, char in enumerate(line):
-                    # 如果是 'P'，记录玩家位置，地图上把它当空地(0)处理
+                
+                # 4. 自动补全：如果这就行短，后面补空格
+                padded_line = line.ljust(max_width, ' ')
+                
+                for x, char in enumerate(padded_line):
                     if char == 'P':
                         self.player_x = x
                         self.player_y = y
                         val = 0
                     else:
-                        val = char_map.get(char, 0) # 默认是0
+                        # 如果遇到未知的字符，默认当做虚空(-1)
+                        val = char_map.get(char, -1) 
                     row_data.append(val)
                 new_grid.append(row_data)
 
