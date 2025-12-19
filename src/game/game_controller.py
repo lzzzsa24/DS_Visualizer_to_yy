@@ -1,4 +1,4 @@
-from PyQt6.QtCore import Qt, QObject
+from PyQt6.QtCore import Qt, QObject,QTimer
 from src.game.game_model import GameModel
 from src.game.game_view import GameView
 from src.model.exceptions import StructureFullError,StructureEmptyError
@@ -10,14 +10,47 @@ class GameController(QObject):
         self.model = GameModel() 
 
         # 连接键盘信号
-        self.view.key_pressed_signal.connect(self.handle_input)
+        self.view.key_pressed_signal.connect(self.on_key_pressed)
+        self.view.key_released_signal.connect(self.on_key_released)
 
         # 连接复活信号
         self.view.game_over_overlay.retry_signal.connect(self.reset_game)
         self.view.game_over_overlay.quit_signal.connect(self.quit_game)
-        
+
+        # 移动循环
+        self.pressed_keys = set()
+        self.move_timer = QTimer()
+        self.move_timer.setInterval(200)  # 每200毫秒处理一次移动
+        self.move_timer.timeout.connect(self.process_movement)
+
         # 初始刷新
         self.refresh_view()
+
+    def on_key_pressed(self, key_code):
+        """处理按键按下事件"""
+        if self.model.is_game_over:
+            return
+
+        self.pressed_keys.add(key_code)
+        if not self.move_timer.isActive():
+            self.process_movement()  # 立即处理一次移动
+            self.move_timer.start()
+
+    def on_key_released(self, key_code):
+        """处理按键释放事件"""
+        if key_code in self.pressed_keys:
+            self.pressed_keys.remove(key_code)
+        if not self.pressed_keys:
+            self.move_timer.stop()
+
+    def process_movement(self):
+        """根据当前按下的键处理移动"""
+        if self.model.is_game_over:
+            self.move_timer.stop()
+            return
+        
+        for key_code in list(self.pressed_keys):
+            self.handle_input(key_code)
         
     def reset_game(self):
         """复活：重置当前关卡"""

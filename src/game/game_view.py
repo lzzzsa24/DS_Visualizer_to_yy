@@ -6,6 +6,7 @@ from PyQt6.QtGui import QBrush, QColor, QKeyEvent, QFont, QPen
 class GameView(QWidget):
     # 定义信号
     key_pressed_signal = pyqtSignal(int) 
+    key_released_signal = pyqtSignal(int)
 
     def __init__(self):
         super().__init__()
@@ -236,7 +237,13 @@ class GameView(QWidget):
 
     def keyPressEvent(self, event: QKeyEvent):
         """捕获键盘，直接转发给 Controller"""
-        self.key_pressed_signal.emit(event.key())
+        if not event.isAutoRepeat():
+            self.key_pressed_signal.emit(event.key())
+
+    def keyReleaseEvent(self, event: QKeyEvent):
+        """捕获键盘释放，直接转发给 Controller"""
+        if not event.isAutoRepeat():
+            self.key_released_signal.emit(event.key())
 
     def show_game_over(self):
         """显示复活界面"""
