@@ -24,6 +24,8 @@ class GameModel:
         #移动相关
         self.player_x=0.0
         self.player_y=0.0
+        self.player_start_x = 0.0  # 关卡中标记的初始位置
+        self.player_start_y = 0.0
         self.move_speed=0.1  # 每次刷新移动的格子数
         self.player_size=0.6  # 玩家碰撞箱大小（格子数）
         # 地图定义
@@ -62,6 +64,7 @@ class GameModel:
         }
 
         new_grid = []
+        player_found = False  # 标记是否在文件中找到玩家位置
         
         # 读取文件
         with open(full_path, 'r', encoding='utf-8') as f:
@@ -86,6 +89,9 @@ class GameModel:
                     if char == 'P':
                         self.player_x = float(x)
                         self.player_y = float(y)
+                        self.player_start_x = float(x)  # 记录初始位置
+                        self.player_start_y = float(y)
+                        player_found = True
                         val = 0
                     else:
                         # 如果遇到未知的字符，默认当做虚空(-1)
@@ -96,6 +102,11 @@ class GameModel:
         self.grid = new_grid
         self.grid_height = len(self.grid)
         self.grid_width = len(self.grid[0]) if self.grid_height > 0 else 0
+        
+        # 如果文件中没有找到玩家位置标记，使用记录的初始位置或默认位置
+        if not player_found:
+            self.player_x = self.player_start_x
+            self.player_y = self.player_start_y
         
         # 每次进新关卡，背包清空
         self.backpack.clear()
