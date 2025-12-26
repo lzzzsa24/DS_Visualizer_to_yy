@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import QLineEdit, QLabel
-from PyQt6.QtCore import QUrl, QTimer
+from PyQt6.QtCore import QUrl
 from PyQt6.QtMultimedia import QSoundEffect
 from src.model.linked_list import LinkedList
 from src.view.linked_list_canvas import LinkedListCanvas
@@ -74,19 +74,15 @@ class LinkedListController:
             return
 
         try:
-            # 先找到要删除的节点索引
             items = self.linked_list.get_items()
             delete_index = -1
             for i, item in enumerate(items):
                 if str(item) == str(value):
                     delete_index = i
                     break
-            
+
             if delete_index >= 0:
-                # 先高亮要删除的节点
-                self.canvas.highlight_node(delete_index)
-                # 500ms后执行删除
-                QTimer.singleShot(500, lambda: self._execute_delete(value, delete_index))
+                self._execute_delete(value, delete_index)
             else:
                 self.status_message.setText(f"未找到元素: {value}")
                 self.status_message.setStyleSheet("color: orange;")
@@ -100,8 +96,8 @@ class LinkedListController:
         success = self.linked_list.delete(value)
         if success:
             self.refresh_view()
-            # 删除后触发向左合拢动画
-            self.canvas.animate_delete_slide(index)
+            # 删除几何动画
+            self.canvas.animate_delete(index, value)
             self._on_success(f"成功删除: {value}", self.remove_sound)
 
     def on_insert_at_click(self):
@@ -139,8 +135,8 @@ class LinkedListController:
         try:
             deleted_value = self.linked_list.delete_head()
             self.refresh_view()
-            # 头部删除后触发向左合拢动画（从0开始）
-            self.canvas.animate_delete_slide(0)
+            # 头部删除几何动画
+            self.canvas.animate_delete(0, deleted_value)
             self._on_success(f"头部删除: {deleted_value}", self.remove_sound)
         except StructureEmptyError:
             self._show_error("链表为空！")
@@ -151,8 +147,8 @@ class LinkedListController:
             tail_index = max(0, self.linked_list.size() - 1)
             deleted_value = self.linked_list.delete_tail()
             self.refresh_view()
-            # 尾部删除触发轻微动画以保持一致性
-            self.canvas.animate_delete_slide(tail_index)
+            # 尾部删除几何动画
+            self.canvas.animate_delete(tail_index, deleted_value)
             self._on_success(f"尾部删除: {deleted_value}", self.remove_sound)
         except StructureEmptyError:
             self._show_error("链表为空！")
@@ -170,10 +166,7 @@ class LinkedListController:
         
         try:
             position = int(position_text)
-            # 先高亮要删除的节点
-            self.canvas.highlight_node(position)
-            # 500ms后执行删除
-            QTimer.singleShot(500, lambda: self._execute_delete_at(position))
+            self._execute_delete_at(position)
             if self.position_input:
                 self.position_input.clear()
         except ValueError:
@@ -184,12 +177,12 @@ class LinkedListController:
         try:
             deleted_value = self.linked_list.delete_at(position)
             self.refresh_view()
-            # 指定位置删除后触发向左合拢动画
-            self.canvas.animate_delete_slide(position)
+            # 指定位置删除几何动画
+            self.canvas.animate_delete(position, deleted_value)
             self.status_message.setText(f"位置 {position} 删除: {deleted_value}")
             self.status_message.setStyleSheet("color: green;")
             self.remove_sound.play()
-            self.input_field.setFocus()
+            self.position_input.setFocus()
         except (StructureValueError, StructureEmptyError) as e:
             self._show_error(str(e))
 

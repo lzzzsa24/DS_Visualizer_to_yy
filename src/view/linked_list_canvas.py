@@ -1,3 +1,4 @@
+import math
 from PyQt6.QtWidgets import QWidget
 from PyQt6.QtGui import QPainter, QColor, QFont, QPen, QBrush
 from PyQt6.QtCore import Qt, QTimer
@@ -14,10 +15,9 @@ class LinkedListCanvas(QWidget):
         self.setPalette(p)
         
         # 动画相关属性
-        self.highlight_index = -1  # 高亮的节点索引
         self.new_node_index = -1   # 新插入节点的索引
         self.delete_node_index = -1  # 删除节点的索引
-        self.animation_alpha = 255  # 动画透明度 (0-255)
+        self.animation_alpha = 255  # 透明度（删除动画遗留，不再用于插入）
         self.animation_timer = QTimer()
         self.animation_timer.timeout.connect(self._animate)
         self.animation_step = 0
@@ -29,8 +29,21 @@ class LinkedListCanvas(QWidget):
         self.old_pointer_to = -1  # 旧指针的目标节点
         self.new_pointer_from = -1  # 新指针的起始节点
         self.new_pointer_to = -1  # 新指针的目标节点
-        self.pointer_alpha = 0  # 指针动画透明度
+        self.pointer_alpha = 0  # 指针动画透明度（不再用于插入）
         self.animation_phase = 0  # 动画阶段
+        # 插入几何动画进度
+        self.new_arrow_progress = 0.0  # 新节点箭头从 None 指向下一个的进度 0->1
+        self.prev_arrow_progress = 0.0 # 前驱节点箭头指向新节点的进度 0->1
+        self.drop_progress = 0.0       # 新节点下落进度 0->1
+        # 删除几何动画状态
+        self.delete_active = False
+        self.delete_arrow_progress = 0.0
+        self.delete_lift_progress = 0.0
+        self.delete_lift_height = 50
+        self.delete_prev_index = -1
+        self.delete_next_index = -1
+        self.delete_ghost_value = None
+        self.delete_fade_progress = 0.0
         
         # 滑动插入动画状态
         self.slide_active = False
@@ -48,21 +61,21 @@ class LinkedListCanvas(QWidget):
         self.data_items = items
         self.update()
     
-    def highlight_node(self, index: int):
-        """高亮指定节点"""
-        self.highlight_index = index
-        self.update()
-        # 500ms后取消高亮
-        QTimer.singleShot(500, lambda: self._clear_highlight())
-    
     def animate_insert_slide(self, index: int):
-        """滑动插入动画：右侧节点滑动让位 + 新节点自上方滑入 + 指针淡入"""
+        """滑动插入动画：新节点出现与指针转向 → 前驱转向 → 节点右移 + 新节点下落"""
         self.new_node_index = index
         self.slide_active = True
         self.slide_index = index
         self.slide_progress = 0.0
         self.animation_step = 0
-        self.animation_phase = 0  # 0:右侧滑动让位, 1:新节点下滑, 2:指针连接淡入
+        # 重构阶段：0 新节点上方出现并指向 None（后继不动）
+        # 1 新节点箭头从 None 转向下一个
+        # 2 前驱箭头从原指向（后继）转向斜上方的新节点
+        # 3 后续节点同时右移、新节点下落，箭头随动
+        self.animation_phase = 0
+        self.new_arrow_progress = 0.0
+        self.prev_arrow_progress = 0.0
+        self.drop_progress = 0.0
 
         # 指针目标（基于插入后的 data_items）
         if index >= 0 and index < len(self.data_items) - 1:
@@ -77,32 +90,23 @@ class LinkedListCanvas(QWidget):
         self.pointer_alpha = 0
         self.animation_timer.start(30)
     
-    def animate_delete(self, index: int):
-        """删除节点动画（带指针变化）"""
+    def animate_delete(self, index: int, value=None):
+        """删除节点动画：节点上提 + 右侧合拢 → 前驱箭头转向后继/None"""
         self.delete_node_index = index
-        self.pointer_animation_active = True
-        self.animation_alpha = 255
+        self.delete_ghost_value = value
+        self.delete_prev_index = index - 1 if index > 0 else -1
+        self.delete_next_index = index if index < len(self.data_items) else -1
+        self.delete_active = True
+        self.delete_arrow_progress = 0.0
+        self.delete_lift_progress = 0.0
+        self.delete_fade_progress = 0.0
+        self.animation_phase = 0
         self.animation_step = 0
-        self.animation_phase = 0  # 0:高亮节点, 1:指针跳过, 2:节点淡出
-        
-        # 设置指针跳过动画（注意：此方法适用于删除前的可视状态）
-        if index > 0 and index < len(self.data_items) - 1:
-            self.old_pointer_from = index - 1
-            self.old_pointer_to = index
-            self.new_pointer_from = index - 1
-            self.new_pointer_to = index + 1
-        elif index == 0 and len(self.data_items) > 1:
-            self.old_pointer_to = 0
-            self.new_pointer_to = 1
-        
-        self.animation_timer.start(30)
-
-    def animate_delete_slide(self, index: int):
-        """删除后向左合拢动画：右侧节点向左滑动填补空位"""
+        # 右侧节点初始保持在旧位置，随后向左合拢
+        self.slide_delete_active = True
         self.delete_slide_index = index
         self.delete_slide_progress = 1.0
-        self.slide_delete_active = True
-        # 单独启动计时器（可能与其他动画共用）
+        self.pointer_animation_active = False
         self.animation_timer.start(30)
     
     def _animate(self):
@@ -110,58 +114,81 @@ class LinkedListCanvas(QWidget):
         self.animation_step += 1
         
         if self.slide_active and self.new_node_index >= 0:
-            # 滑动插入三阶段动画
+            # 新插入五步几何动画
             if self.animation_phase == 0:
-                # 阶段0：右侧节点向右滑动让位
-                self.slide_progress = min(1.0, self.slide_progress + 0.08)
-                if self.slide_progress >= 1.0:
-                    self.animation_phase = 1
-                    self.animation_step = 0
+                # 新节点上方出现，箭头指向 None
+                if self.animation_step >= 10:
+                    if self.new_pointer_to < 0:
+                        # 无后继：直接转前驱阶段或下落
+                        if self.slide_index > 0:
+                            self.animation_phase = 2
+                            self.animation_step = 0
+                            self.prev_arrow_progress = 0.0
+                        else:
+                            self.animation_phase = 3
+                            self.animation_step = 0
+                    else:
+                        self.animation_phase = 1
+                        self.animation_step = 0
             elif self.animation_phase == 1:
-                # 阶段1：新节点由上向下滑入
-                self.animation_alpha = min(255, 100 + self.animation_step * 20)
-                if self.animation_step >= 12:  # 约 360ms
-                    self.animation_phase = 2
-                    self.animation_step = 0
+                # 新节点箭头从 None 转向后继
+                self.new_arrow_progress = min(1.0, self.new_arrow_progress + 0.08)
+                if self.new_arrow_progress >= 1.0:
+                    if self.slide_index > 0:
+                        self.animation_phase = 2
+                        self.animation_step = 0
+                        self.prev_arrow_progress = 0.0
+                    else:
+                        self.animation_phase = 3
+                        self.animation_step = 0
             elif self.animation_phase == 2:
-                # 阶段2：指针淡入连接
-                self.pointer_alpha = min(255, self.pointer_alpha + 25)
-                if self.pointer_alpha >= 255:
-                    # 结束动画
+                # 前驱箭头转向新节点（旧指向为后继）
+                self.prev_arrow_progress = min(1.0, self.prev_arrow_progress + 0.08)
+                if self.prev_arrow_progress >= 1.0:
+                    self.animation_phase = 3
+                    self.animation_step = 0
+                    self.slide_progress = 0.0
+                    self.drop_progress = 0.0
+            elif self.animation_phase == 3:
+                # 后续节点右移 + 新节点下落，箭头随动
+                self.slide_progress = min(1.0, self.slide_progress + 0.08)
+                self.drop_progress = self.slide_progress
+                if self.slide_progress >= 1.0:
                     self.animation_timer.stop()
                     self.slide_active = False
                     self._reset_animation_state()
 
-        # 删除后的向左合拢动画（独立于上面的阶段）
-        if self.slide_delete_active:
-            self.delete_slide_progress = max(0.0, self.delete_slide_progress - 0.08)
-            if self.delete_slide_progress <= 0.0:
-                self.slide_delete_active = False
-                # 不停止 timer，可能还有其他动画；若无其他动画，停止
-                if not (self.slide_active or self.pointer_animation_active or self.delete_node_index >= 0):
-                    self.animation_timer.stop()
-            self.update()
-        
-        elif self.delete_node_index >= 0:
-            # 删除动画
+        # 删除动画阶段
+        if self.delete_active and self.delete_node_index >= 0:
             if self.animation_phase == 0:
-                # 阶段1：高亮需要删除的节点
-                if self.animation_step >= 15:  # 保持高亮450ms
-                    self.animation_phase = 1
-                    self.animation_step = 0
+                # 节点上提淡出，同时右侧节点向左合拢，箭头随动
+                self.delete_lift_progress = min(1.0, self.delete_lift_progress + 0.06)
+                if self.slide_delete_active:
+                    self.delete_slide_progress = max(0.0, self.delete_slide_progress - 0.05)
+                    if self.delete_slide_progress <= 0.0:
+                        self.slide_delete_active = False
+                if self.delete_lift_progress >= 1.0 and not self.slide_delete_active:
+                    if self.delete_prev_index >= 0:
+                        self.animation_phase = 1
+                        self.animation_step = 0
+                        self.delete_arrow_progress = 0.0
+                    else:
+                        self.animation_timer.stop()
+                        self._reset_animation_state()
             elif self.animation_phase == 1:
-                # 阶段2：显示指针跳过
-                self.pointer_alpha = min(255, self.animation_step * 25)
-                if self.pointer_alpha >= 255:
+                # 前驱箭头缓缓转向后继/None
+                self.delete_arrow_progress = min(1.0, self.delete_arrow_progress + 0.06)
+                if self.delete_arrow_progress >= 1.0:
                     self.animation_phase = 2
                     self.animation_step = 0
+                    self.delete_fade_progress = 0.0
             elif self.animation_phase == 2:
-                # 阶段3：节点渐隐
-                self.animation_alpha = max(0, 255 - self.animation_step * 25)
-                if self.animation_alpha <= 0:
+                # 指针到位后才开始淡出
+                self.delete_fade_progress = min(1.0, self.delete_fade_progress + 0.08)
+                if self.delete_fade_progress >= 1.0:
                     self.animation_timer.stop()
                     self._reset_animation_state()
-        
+
         self.update()
     
     def _reset_animation_state(self):
@@ -175,12 +202,21 @@ class LinkedListCanvas(QWidget):
         self.new_pointer_to = -1
         self.pointer_alpha = 0
         self.animation_phase = 0
+        self.slide_progress = 0.0
+        self.drop_progress = 0.0
+        self.new_arrow_progress = 0.0
+        self.prev_arrow_progress = 0.0
+        self.delete_active = False
+        self.delete_arrow_progress = 0.0
+        self.delete_lift_progress = 0.0
+        self.delete_prev_index = -1
+        self.delete_next_index = -1
+        self.delete_ghost_value = None
+        self.slide_delete_active = False
+        self.delete_slide_index = -1
+        self.delete_slide_progress = 1.0
+        self.delete_fade_progress = 0.0
     
-    def _clear_highlight(self):
-        """清除高亮"""
-        self.highlight_index = -1
-        self.update()
-
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -209,20 +245,20 @@ class LinkedListCanvas(QWidget):
             x = start_x + i * (node_width + spacing)
             y = start_y
             
-            # 插入阶段0：不渲染新节点本体（避免先出现在目标位置）
-            skip_new_node_draw = (self.slide_active and i == self.slide_index and self.animation_phase == 0)
+            # 新节点立即可见（在上方悬浮），不再跳过绘制
+            skip_new_node_draw = False
             
-            # 滑动插入时：插入位置右侧的节点先向右偏移，随后回位
+            # 插入时：后侧节点保持旧位置，最终回位
             if self.slide_active and i > self.slide_index:
-                # 从旧位置（左侧）缓慢滑到新位置（右侧）
-                # 新位置为 x，旧位置为 x - shift_distance
-                # 因此应用负偏移使初始显示在旧位置，随后滑到 x
                 offset = int(self.shift_distance * (1.0 - self.slide_progress))
                 x -= offset
             
-            # 新节点从上方滑入（仅插入位置，阶段1下滑一次；阶段2保持到位）
-            if self.slide_active and i == self.slide_index and self.animation_phase == 1:
-                y = start_y - int(self.new_node_start_offset_y * (1.0 - min(1.0, self.animation_step / 12.0)))
+            # 新节点上方悬浮与下落
+            if self.slide_active and i == self.slide_index:
+                if self.animation_phase <= 2:
+                    y = start_y - self.new_node_start_offset_y
+                elif self.animation_phase == 3:
+                    y = start_y - int(self.new_node_start_offset_y * (1.0 - self.drop_progress))
 
             # 删除后向左合拢：删除位置右侧的节点从右侧回位
             if self.slide_delete_active and i >= self.delete_slide_index:
@@ -232,7 +268,7 @@ class LinkedListCanvas(QWidget):
             # 1. 绘制节点连线 (箭头)
             arrow_start_x = x + node_width
             arrow_end_x = arrow_start_x + spacing
-            center_y = start_y + node_height // 2
+            center_y = y + node_height // 2
             
             # 决定是否绘制这个箭头
             should_draw_arrow = True
@@ -244,64 +280,131 @@ class LinkedListCanvas(QWidget):
             if self.pointer_animation_active:
                 # 删除动画中，显示旧指针淡出
                 if self.animation_phase >= 1 and i == self.old_pointer_from and self.old_pointer_to == i + 1:
-                    arrow_alpha = max(0, 255 - self.pointer_alpha)
+                    # 移除颜色/透明度动画，始终使用固定颜色
+                    arrow_alpha = 255
                 # 删除动画中，显示新指针出现（跳过删除节点）
                 elif self.animation_phase >= 1 and i == self.new_pointer_from and self.new_pointer_to > i + 1:
                     # 绘制跳过的曲线箭头
-                    if self.pointer_alpha > 0:
+                    if self.pointer_alpha >= 0:
                         self._draw_curved_arrow(painter, x + node_width, start_y + node_height // 2,
                                               start_x + self.new_pointer_to * (node_width + spacing), 
                                               start_y + node_height // 2,
-                                              QColor(0, 200, 0, self.pointer_alpha), 3)
+                                              QColor(128, 128, 128, 255), 3)
                     should_draw_arrow = False
             
-            # 插入阶段0：前驱 -> 新节点的箭头暂不绘制（新节点尚未出现）
-            if self.slide_active and self.animation_phase == 0 and i == self.slide_index - 1:
+            # 插入动画定制箭头
+            next_exists = (self.new_pointer_to >= 0 and self.new_pointer_to < len(self.data_items))
+            next_x = start_x + self.new_pointer_to * (node_width + spacing) if next_exists else None
+            if self.slide_active and next_exists and self.new_pointer_to > self.slide_index:
+                next_x -= int(self.shift_distance * (1.0 - self.slide_progress))
+            next_y = start_y + node_height // 2 if next_exists else None
+
+            # 新节点箭头
+            if self.slide_active and i == self.slide_index:
                 should_draw_arrow = False
+                sx = x + node_width
+                sy = center_y
+                if self.animation_phase == 0:
+                    ex = sx + spacing
+                    ey = sy
+                    self._draw_arrow_line(painter, sx, sy, ex, ey, QColor(128, 128, 128, 255), 2)
+                    painter.setFont(QFont("Arial", 10))
+                    painter.setPen(Qt.GlobalColor.gray)
+                    painter.drawText(ex + 5, ey + 5, "None")
+                    painter.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+                elif self.animation_phase == 1 and next_exists:
+                    ex0, ey0 = sx + spacing, sy
+                    ex1, ey1 = next_x, next_y
+                    ex = int(ex0 + (ex1 - ex0) * self.new_arrow_progress)
+                    ey = int(ey0 + (ey1 - ey0) * self.new_arrow_progress)
+                    self._draw_arrow_line(painter, sx, sy, ex, ey, QColor(128, 128, 128, 255), 2)
+                elif self.animation_phase in (2, 3) and next_exists:
+                    self._draw_arrow_line(painter, sx, sy, next_x, next_y, QColor(128, 128, 128, 255), 2)
+                else:
+                    ex = sx + spacing
+                    ey = sy
+                    self._draw_arrow_line(painter, sx, sy, ex, ey, QColor(128, 128, 128, 255), 2)
+                    painter.setFont(QFont("Arial", 10))
+                    painter.setPen(Qt.GlobalColor.gray)
+                    painter.drawText(ex + 5, ey + 5, "None")
+                    painter.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+
+            # 前驱箭头
+            prev_idx = self.slide_index - 1
+            if self.slide_active and prev_idx >= 0 and i == prev_idx:
+                should_draw_arrow = False
+                psx = x + node_width
+                psy = center_y
+                # 旧指向（后继或 None）
+                if next_exists:
+                    old_ex, old_ey = next_x, next_y
+                else:
+                    old_ex, old_ey = psx + spacing, psy
+                # 新指向（新节点左侧，中间高度）
+                new_node_x = start_x + self.slide_index * (node_width + spacing)
+                # 新节点当前位置 y（与上方悬浮/下落保持一致）
+                if self.animation_phase <= 2:
+                    new_node_y = start_y - self.new_node_start_offset_y
+                else:
+                    new_node_y = start_y - int(self.new_node_start_offset_y * (1.0 - self.drop_progress))
+                new_ex = new_node_x
+                new_ey = new_node_y + node_height // 2
+
+                if self.animation_phase == 2:
+                    ex = int(old_ex + (new_ex - old_ex) * self.prev_arrow_progress)
+                    ey = int(old_ey + (new_ey - old_ey) * self.prev_arrow_progress)
+                    self._draw_arrow_line(painter, psx, psy, ex, ey, QColor(128, 128, 128, 255), 2)
+                elif self.animation_phase == 3:
+                    self._draw_arrow_line(painter, psx, psy, new_ex, new_ey, QColor(128, 128, 128, 255), 2)
+                else:
+                    self._draw_arrow_line(painter, psx, psy, old_ex, old_ey, QColor(128, 128, 128, 255), 2)
             
+            # 删除动画定制箭头（前驱 -> 删除节点/后继）
+            if self.delete_active and i == self.delete_prev_index:
+                should_draw_arrow = False
+                psx = x + node_width
+                psy = center_y
+                ghost_x = start_x + self.delete_node_index * (node_width + spacing)
+                ghost_y = start_y - int(self.delete_lift_height * self.delete_lift_progress)
+                ghost_ey = ghost_y + node_height // 2
+                # 新指向：后继节点现位置或 None（随合拢变化）
+                if self.delete_next_index >= 0 and self.delete_next_index < len(self.data_items):
+                    new_ex = start_x + self.delete_next_index * (node_width + spacing)
+                    if self.slide_delete_active and self.delete_next_index >= self.delete_slide_index:
+                        new_ex += int(self.shift_distance * self.delete_slide_progress)
+                    new_ey = start_y + node_height // 2
+                else:
+                    new_ex = psx + spacing
+                    new_ey = psy
+
+                if self.animation_phase == 0:
+                    self._draw_arrow_line(painter, psx, psy, ghost_x, ghost_ey, QColor(128, 128, 128, 255), 2)
+                elif self.animation_phase == 1:
+                    ex = int(ghost_x + (new_ex - ghost_x) * self.delete_arrow_progress)
+                    ey = int(ghost_ey + (new_ey - ghost_ey) * self.delete_arrow_progress)
+                    self._draw_arrow_line(painter, psx, psy, ex, ey, QColor(128, 128, 128, 255), 2)
+                else:
+                    self._draw_arrow_line(painter, psx, psy, new_ex, new_ey, QColor(128, 128, 128, 255), 2)
+
             # 绘制普通箭头
             if should_draw_arrow:
-                painter.setPen(QPen(QColor(128, 128, 128, arrow_alpha), arrow_width))
-                
                 if i < len(self.data_items) - 1:
                     # 指向下一个节点
-                    painter.drawLine(arrow_start_x, center_y, arrow_end_x, center_y)
-                    # 箭头头部 ( > 形状)
-                    painter.drawLine(arrow_end_x - 10, center_y - 5, arrow_end_x, center_y)
-                    painter.drawLine(arrow_end_x - 10, center_y + 5, arrow_end_x, center_y)
+                    self._draw_arrow_line(painter, arrow_start_x, center_y, arrow_end_x, center_y,
+                                          QColor(128, 128, 128, arrow_alpha), arrow_width)
                 else:
-                    # 最后一个节点指向 None
-                    painter.drawLine(arrow_start_x, center_y, arrow_end_x, center_y)
-                    # 画 None 文字
+                    # 最后一个节点指向 None（统一箭头规格）
+                    self._draw_arrow_line(painter, arrow_start_x, center_y, arrow_end_x, center_y,
+                                          QColor(128, 128, 128, arrow_alpha), arrow_width)
                     painter.setFont(QFont("Arial", 10))
                     painter.setPen(Qt.GlobalColor.gray)
                     painter.drawText(arrow_end_x + 5, center_y + 5, "None")
-                    # 箭头头部
-                    painter.drawLine(arrow_end_x - 10, center_y - 5, arrow_end_x, center_y)
-                    painter.drawLine(arrow_end_x - 10, center_y + 5, arrow_end_x, center_y)
-                    # 恢复字体以供下一次循环绘制节点
                     painter.setFont(QFont("Arial", 12, QFont.Weight.Bold))
 
             # 2. 绘制节点方块
-            # 根据状态选择颜色
-            if i == self.highlight_index:
-                # 高亮节点：黄色
-                painter.setBrush(QBrush(QColor(255, 215, 0)))
-                painter.setPen(QPen(QColor(218, 165, 32), 3))
-            elif i == self.new_node_index:
-                # 新插入节点：渐变绿色
-                color = QColor(0, 255, 0, self.animation_alpha)
-                painter.setBrush(QBrush(color))
-                painter.setPen(QPen(QColor(34, 139, 34), 2))
-            elif i == self.delete_node_index:
-                # 删除节点：渐变红色
-                color = QColor(255, 0, 0, self.animation_alpha)
-                painter.setBrush(QBrush(color))
-                painter.setPen(QPen(QColor(139, 0, 0), 2))
-            else:
-                # 普通节点：浅蓝色
-                painter.setBrush(QBrush(QColor(173, 216, 230)))
-                painter.setPen(QPen(QColor(152, 180, 212), 2))
+            # 固定颜色：浅蓝色节点，不再使用颜色变化
+            painter.setBrush(QBrush(QColor(173, 216, 230)))
+            painter.setPen(QPen(QColor(152, 180, 212), 2))
             
             # 跳过新节点的绘制（插入阶段0），只在阶段1开始下滑时出现
             if not skip_new_node_draw:
@@ -313,15 +416,39 @@ class LinkedListCanvas(QWidget):
                 painter.drawText(x, y, node_width, node_height, 
                                Qt.AlignmentFlag.AlignCenter, str(item))
 
-        # 插入动画时，新指针淡入（index -> index+1）
-        if self.slide_active and self.animation_phase == 2 and self.new_pointer_from >= 0:
-            from_x = start_x + self.new_pointer_from * (node_width + spacing) + node_width
-            to_x = start_x + self.new_pointer_to * (node_width + spacing)
-            y = start_y + node_height // 2
-            painter.setPen(QPen(QColor(0, 200, 0, self.pointer_alpha), 3))
-            painter.drawLine(from_x, y, to_x, y)
-            painter.drawLine(to_x - 10, y - 5, to_x, y)
-            painter.drawLine(to_x - 10, y + 5, to_x, y)
+        # 删除动画中的“幽灵”节点：箭头与节点同步淡出
+        if self.delete_active and self.delete_node_index >= 0:
+            ghost_x = start_x + self.delete_node_index * (node_width + spacing)
+            ghost_y = start_y - int(self.delete_lift_height * self.delete_lift_progress)
+            if self.animation_phase in (0, 1):
+                alpha = 255  # 指针未完全指向后继前保持不透明
+            elif self.animation_phase == 2:
+                alpha = max(0, 255 - int(255 * self.delete_fade_progress))
+            else:
+                alpha = 0
+
+            if alpha > 0:
+                arrow_sx = ghost_x + node_width
+                arrow_sy = ghost_y + node_height // 2
+                if self.delete_next_index >= 0 and self.delete_next_index < len(self.data_items):
+                    target_x = start_x + self.delete_next_index * (node_width + spacing)
+                    if self.slide_delete_active and self.delete_next_index >= self.delete_slide_index:
+                        target_x += int(self.shift_distance * self.delete_slide_progress)
+                    target_y = start_y + node_height // 2
+                else:
+                    target_x = arrow_sx + spacing
+                    target_y = arrow_sy
+                self._draw_arrow_line(painter, arrow_sx, arrow_sy, target_x, target_y, QColor(128, 128, 128, alpha), 2)
+
+                painter.setBrush(QBrush(QColor(173, 216, 230, alpha)))
+                painter.setPen(QPen(QColor(152, 180, 212, alpha), 2))
+                painter.drawRect(ghost_x, ghost_y, node_width, node_height)
+                painter.setPen(QColor(255, 255, 255, alpha))
+                text_value = str(self.delete_ghost_value) if self.delete_ghost_value is not None else ""
+                painter.drawText(ghost_x, ghost_y, node_width, node_height,
+                                 Qt.AlignmentFlag.AlignCenter, text_value)
+
+        # 已移除插入阶段的颜色淡入箭头，改为几何插值绘制（见上方阶段2与阶段3）
     
     def _draw_curved_arrow(self, painter, x1, y1, x2, y2, color, width):
         """绘制弧形箭头（用于显示指针跳过）"""
@@ -341,3 +468,16 @@ class LinkedListCanvas(QWidget):
         # 绘制箭头
         painter.drawLine(x2 - 10, y2 - 5, x2, y2)
         painter.drawLine(x2 - 10, y2 + 5, x2, y2)
+
+    def _draw_arrow_line(self, painter, x1, y1, x2, y2, color, width):
+        """绘制带角度箭头的直线"""
+        painter.setPen(QPen(color, width))
+        painter.drawLine(x1, y1, x2, y2)
+        angle = math.atan2(y2 - y1, x2 - x1)
+        size = 10
+        ax1 = x2 - size * math.cos(angle - math.pi / 6)
+        ay1 = y2 - size * math.sin(angle - math.pi / 6)
+        ax2 = x2 - size * math.cos(angle + math.pi / 6)
+        ay2 = y2 - size * math.sin(angle + math.pi / 6)
+        painter.drawLine(x2, y2, int(ax1), int(ay1))
+        painter.drawLine(x2, y2, int(ax2), int(ay2))
