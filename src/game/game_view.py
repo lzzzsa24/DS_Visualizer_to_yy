@@ -28,7 +28,27 @@ class GameView(QWidget):
         self.game_over_overlay = GameOverOverlay(self)
 
         
-        self.cell_size = 40 # 像素大小
+        self.cell_size = 40
+        # 预置绘制资源与缓存结构
+        self.skin_map = {
+            0: ("·", "#404040"),
+            1: ("墙", "#7f8c8d"),
+            2: ("我", "#e74c3c"),
+            3: ("水", "#2ecc71"),
+            4: ("剑", "#3498db"),
+            5: ("匙", "#f1c40f"),
+            6: ("火", "#e67e22"),
+            7: ("怪", "#9b59b6"),
+            8: ("门", "#ecf0f1")
+        }
+        self.font = QFont("SimHei", int(self.cell_size * 0.6))
+        self.font.setBold(True)
+        self.tile_items = []   # 2D: QGraphicsTextItem or None
+        self.tile_values = []  # 2D: int
+        self.player_item = None
+        self.map_pixel_width = 0
+        self.map_pixel_height = 0
+        self.large_map = False
 
         #HUD:左上角背包显示
         self.backpack_capacity = 3
@@ -136,9 +156,73 @@ class GameView(QWidget):
                 text_item.setPos(text_x, text_y)
 
             
-    def render(self, grid, player_pos, msg):
-        """根据传入的数据渲染画面"""
+    def _build_scene(self, grid):
+        # 首次或关卡变化时重建静态图层
         self.scene.clear()
+        # 清空引用
+        self.player_item = None
+        self.tile_items = []
+        self.tile_values = []
+
+        # 背景
+        self.scene.setBackgroundBrush(QBrush(QColor("#202020")))
+
+        rows = len(grid)
+        cols = len(grid[0]) if rows > 0 else 0
+
+        for y in range(rows):
+            row_items = []
+            row_vals = []
+            for x in range(cols):
+                val = grid[y][x]
+                row_vals.append(val)
+                if val == -1:
+                    row_items.append(None)
+                    continue
+                if val in self.skin_map:
+                    char, color_code = self.skin_map[val]
+                    item = QGraphicsTextItem(char)
+                    item.setFont(self.font)
+                    item.setDefaultTextColor(QColor(color_code))
+                    self.scene.addItem(item)
+                    rect = item.boundingRect()
+                    center_x = (x * self.cell_size) + (self.cell_size - rect.width()) / 2
+                    center_y = (y * self.cell_size) + (self.cell_size - rect.height()) / 2
+                    item.setPos(center_x, center_y)
+                    row_items.append(item)
+                else:
+                    row_items.append(None)
+            self.tile_items.append(row_items)
+            self.tile_values.append(row_vals)
+
+        # 场景边界与尺寸缓存
+        self.map_pixel_width = cols * self.cell_size
+        self.map_pixel_height = rows * self.cell_size
+        self.scene.setSceneRect(0, 0, self.map_pixel_width, self.map_pixel_height)
+
+        # 玩家图元
+        if self.player_item is None:
+            char, color_code = self.skin_map[2]
+            self.player_item = QGraphicsTextItem(char)
+            self.player_item.setFont(self.font)
+            self.player_item.setDefaultTextColor(QColor(color_code))
+            self.scene.addItem(self.player_item)
+
+        # 大图跟随判断
+        view_w = self.view.viewport().width()
+        view_h = self.view.viewport().height()
+        self.large_map = (self.map_pixel_width > view_w or self.map_pixel_height > view_h)
+
+    def render(self, grid, player_pos, msg):
+        """增量渲染：首帧/尺寸变更重建，其余仅更新变化格子与玩家位置"""
+        # 首帧或尺寸变化时重建
+        need_rebuild = False
+        rows = len(grid)
+        cols = len(grid[0]) if rows > 0 else 0
+        if not self.tile_items or len(self.tile_items) != rows or (rows > 0 and len(self.tile_items[0]) != cols):
+            need_rebuild = True
+        if need_rebuild:
+            self._build_scene(grid)
 
         # 更新信息栏
         self.info_label.setText(msg)
@@ -147,93 +231,49 @@ class GameView(QWidget):
         center_x = (self.view.width() - self.info_label.width()) // 2
         self.info_label.move(center_x, 0) # y=0 紧贴顶部
         
-        # 1. 设置背景色 
-        self.scene.setBackgroundBrush(QBrush(QColor("#202020")))
-
-        # 2. 定义【字典】：将数字 ID 映射为 (汉字, 颜色)
-        skin_map = {
-            0: ("·", "#404040"),  # 空地 (用点表示，更有网格感)
-            1: ("墙", "#7f8c8d"),  # 墙壁 - 灰色
-            2: ("我", "#e74c3c"),  # 玩家 - 红色
-            3: ("水", "#2ecc71"),  # 水 - 绿色
-            4: ("剑", "#3498db"),  # 宝剑 - 蓝色
-            5: ("匙", "#f1c40f"),  # 钥匙 - 金色
-            6: ("火", "#e67e22"),  # 火焰 - 橙色
-            7: ("怪", "#9b59b6"),  # 怪物 - 紫色
-            8: ("门", "#ecf0f1")   # 大门 - 白色
-        }
-
-        # 3. 设置字体 
-        font = QFont("SimHei", int(self.cell_size * 0.6))
-        font.setBold(True)
-
-        # 4. 遍历地图并绘制
-        for y, row in enumerate(grid):
-            for x, val in enumerate(row):
+        # 增量更新改变的格子
+        for y in range(rows):
+            for x in range(cols):
+                val = grid[y][x]
                 if val == -1:
-                    continue  # 跳过虚空区域
-                
-                # 获取该位置的皮肤，如果没有定义就跳过
-                if val in skin_map:
-                    char, color_code = skin_map[val]
-                    
-                    # 创建文字项
-                    text_item = QGraphicsTextItem(char)
-                    text_item.setFont(font)
-                    text_item.setDefaultTextColor(QColor(color_code))
-                    
-                    # 居中校准
-                    # 计算偏移量让文字显示在格子正中间
-                    # x_pos = 格子左边缘 + (格子宽 - 文字宽) / 2
+                    continue
+                cur = self.tile_values[y][x]
+                if cur == val:
+                    continue
+                self.tile_values[y][x] = val
+                item = self.tile_items[y][x]
+                if val in self.skin_map:
+                    char, color_code = self.skin_map[val]
+                    if item is None:
+                        item = QGraphicsTextItem(char)
+                        item.setFont(self.font)
+                        item.setDefaultTextColor(QColor(color_code))
+                        self.scene.addItem(item)
+                        rect = item.boundingRect()
+                        center_x = (x * self.cell_size) + (self.cell_size - rect.width()) / 2
+                        center_y = (y * self.cell_size) + (self.cell_size - rect.height()) / 2
+                        item.setPos(center_x, center_y)
+                        self.tile_items[y][x] = item
+                    else:
+                        item.setPlainText(char)
+                        item.setDefaultTextColor(QColor(color_code))
+                else:
+                    # 未定义的符号视为移除
+                    if item is not None:
+                        self.scene.removeItem(item)
+                        self.tile_items[y][x] = None
 
-                    # 先把 item 加进去才能获取宽度
-                    self.scene.addItem(text_item) 
-                    
-                    # 获取文字的实际包围盒
-                    rect = text_item.boundingRect()
-                    text_width = rect.width()
-                    text_height = rect.height()
-                    
-                    # 计算居中位置
-                    center_x = (x * self.cell_size) + (self.cell_size - text_width) / 2
-                    center_y = (y * self.cell_size) + (self.cell_size - text_height) / 2
-                    
-                    text_item.setPos(center_x, center_y)
-
-        # 5. 单独绘制玩家 (覆盖在地图层之上)
+        # 玩家位置更新
         px, py = player_pos
-        char, color_code = skin_map[2] # 获取“我”的皮肤
-        
-        player_item = QGraphicsTextItem(char)
-        player_item.setFont(font)
-        player_item.setDefaultTextColor(QColor(color_code))
-        
-        self.scene.addItem(player_item)
-        
-        # 同样的居中计算
-        rect = player_item.boundingRect()
-        player_item.setPos(
+        rect = self.player_item.boundingRect()
+        self.player_item.setPos(
             (px * self.cell_size) + (self.cell_size - rect.width()) / 2,
             (py * self.cell_size) + (self.cell_size - rect.height()) / 2
         )
 
-        #地图尺寸
-        map_height_rows = len(grid)
-        map_width_cols = len(grid[0]) if map_height_rows > 0 else 0
-        map_pixel_width = map_width_cols * self.cell_size
-        map_pixel_height = map_height_rows * self.cell_size
-        #设定场景边界
-        self.scene.setSceneRect(0, 0, map_pixel_width, map_pixel_height)
-        #窗口尺寸
-        view_w = self.view.viewport().width()
-        view_h = self.view.viewport().height()
-
-        if map_pixel_width > view_w or map_pixel_height > view_h:
-            # 地图很大，开启跟随模式
-            self.view.centerOn(player_item)
-        else:
-            # 地图较小，居中显示
-            pass
+        # 大图跟随
+        if self.large_map:
+            self.view.centerOn(self.player_item)
 
     def keyPressEvent(self, event: QKeyEvent):
         """捕获键盘，直接转发给 Controller"""

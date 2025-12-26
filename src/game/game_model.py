@@ -24,7 +24,7 @@ class GameModel:
         #移动相关
         self.player_x=0.0
         self.player_y=0.0
-        self.move_speed=0.15  # 每次刷新移动的格子数
+        self.move_speed=0.1  # 每次刷新移动的格子数
         self.player_size=0.6  # 玩家碰撞箱大小（格子数）
         # 地图定义
         self.grid_width = 0

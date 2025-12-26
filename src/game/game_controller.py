@@ -3,7 +3,7 @@ from src.game.game_model import GameModel
 from src.game.game_view import GameView
 from src.model.exceptions import StructureFullError,StructureEmptyError
 from PyQt6.QtMultimedia import QSoundEffect
-import os,math
+import os,math,time
 
 class GameController(QObject):
     def __init__(self, view: GameView):
@@ -29,7 +29,7 @@ class GameController(QObject):
         self.push_sound.setVolume(0.5)  # 设置音量
         self.pop_sound.setVolume(4.0)
         self.error_sound.setVolume(0.3)
-        self.step_sound.setVolume(0.8)
+        self.step_sound.setVolume(0.3)
 
         # 初始化 MVC 组件
         self.view = view
@@ -46,8 +46,13 @@ class GameController(QObject):
         # 移动循环
         self.pressed_keys = set()
         self.move_timer = QTimer()
-        self.move_timer.setInterval(30)  # 每200毫秒处理一次移动
+        self.move_timer.setInterval(16)  # 每16毫秒处理一次移动
         self.move_timer.timeout.connect(self.process_movement)
+        # 记录上次帧时间，用于按实际时间步长移动
+        self.last_update_time = time.perf_counter()
+        # 重要信息保护：记录最近一次“非移动提示”的时间与上次消息
+        self.last_important_msg_time = self.last_update_time
+        self.last_seen_message = ""
 
         # 初始刷新
         self.refresh_view()
@@ -60,6 +65,8 @@ class GameController(QObject):
         self.pressed_keys.add(key_code)
         if not self.move_timer.isActive():
             self.process_movement()  # 立即处理一次移动
+            # 防止第一帧 dt 过大导致跃迁
+            self.last_update_time = time.perf_counter()
             self.move_timer.start()
 
     def on_key_released(self, key_code):
@@ -74,6 +81,18 @@ class GameController(QObject):
         if self.model.is_game_over:
             self.move_timer.stop()
             return
+        # 记录移动前状态
+        prev_x, prev_y = self.model.player_x, self.model.player_y
+        prev_msg = self.model.message
+        # 计算与上帧的真实时间差，确保低帧率下移速不变
+        now = time.perf_counter()
+        dt = now - self.last_update_time
+        self.last_update_time = now
+        baseline = max(self.move_timer.interval() / 1000.0, 1e-3)
+        scale = dt / baseline
+        # 防止极端卡顿导致穿墙，限制单帧最大放大倍数
+        if scale > 2.0:
+            scale = 2.0
         
         # 1. 计算合力方向
         dx, dy = 0.0, 0.0
@@ -88,9 +107,9 @@ class GameController(QObject):
             dx /= length
             dy /= length
 
-        # 应用速度
-        step_x = dx * self.model.move_speed
-        step_y = dy * self.model.move_speed
+        # 应用速度（按时间步长缩放，保持每秒速度稳定）
+        step_x = dx * self.model.move_speed * scale
+        step_y = dy * self.model.move_speed * scale
 
         # 2. 分轴移动 (实现贴墙滑行)
         # 尝试 X 轴移动
@@ -102,6 +121,21 @@ class GameController(QObject):
         if step_y != 0:
             if self.try_move(self.model.player_x, self.model.player_y + step_y):
                 self.model.player_y += step_y
+
+        # 如果本帧中消息被改为非“移动提示”，记录为最新的重要信息时间
+        if self.model.message != prev_msg and self.model.message != "栈，移动！":
+            self.last_important_msg_time = now
+
+        # 若本帧确实产生位移，且没有更高优先级事件覆盖消息，且重要信息已显示≥1秒，则显示“栈，移动！”
+        if (
+            (self.model.player_x != prev_x or self.model.player_y != prev_y)
+            and self.model.message == prev_msg
+            and (now - self.last_important_msg_time) >= 1.0
+        ):
+            self.model.message = "栈，移动！"
+
+        # 记录当前消息供跨帧检测
+        self.last_seen_message = self.model.message
 
         # 3. 播放脚步
         if (step_x != 0 or step_y != 0) and not self.step_sound.isPlaying():
