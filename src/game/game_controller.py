@@ -3,7 +3,7 @@ from src.game.game_model import GameModel
 from src.game.game_view import GameView
 from src.model.exceptions import StructureFullError,StructureEmptyError
 from PyQt6.QtMultimedia import QSoundEffect
-import os
+import os,math
 
 class GameController(QObject):
     def __init__(self, view: GameView):
@@ -46,7 +46,7 @@ class GameController(QObject):
         # 移动循环
         self.pressed_keys = set()
         self.move_timer = QTimer()
-        self.move_timer.setInterval(200)  # 每200毫秒处理一次移动
+        self.move_timer.setInterval(30)  # 每200毫秒处理一次移动
         self.move_timer.timeout.connect(self.process_movement)
 
         # 初始刷新
@@ -75,8 +75,153 @@ class GameController(QObject):
             self.move_timer.stop()
             return
         
-        for key_code in list(self.pressed_keys):
-            self.handle_input(key_code)
+        # 1. 计算合力方向
+        dx, dy = 0.0, 0.0
+        if Qt.Key.Key_W in self.pressed_keys: dy -= 1
+        if Qt.Key.Key_S in self.pressed_keys: dy += 1
+        if Qt.Key.Key_A in self.pressed_keys: dx -= 1
+        if Qt.Key.Key_D in self.pressed_keys: dx += 1
+
+        # 归一化 (防止斜走加速)
+        if dx != 0 or dy != 0:
+            length = math.sqrt(dx**2 + dy**2)
+            dx /= length
+            dy /= length
+
+        # 应用速度
+        step_x = dx * self.model.move_speed
+        step_y = dy * self.model.move_speed
+
+        # 2. 分轴移动 (实现贴墙滑行)
+        # 尝试 X 轴移动
+        if step_x != 0:
+            if self.try_move(self.model.player_x + step_x, self.model.player_y):
+                self.model.player_x += step_x
+        
+        # 尝试 Y 轴移动
+        if step_y != 0:
+            if self.try_move(self.model.player_x, self.model.player_y + step_y):
+                self.model.player_y += step_y
+
+        # 3. 播放脚步
+        if (step_x != 0 or step_y != 0) and not self.step_sound.isPlaying():
+            self.step_sound.play()
+
+        self.refresh_view()
+
+    def try_move(self, new_x, new_y):
+        """
+        尝试移动到新位置。
+        返回 True 表示允许移动（可能是空地，也可能是踩到了道具）。
+        返回 False 表示被阻挡（撞墙，或撞到没钥匙的门）。
+        副作用：如果碰到了道具/怪物，会直接触发交互逻辑。
+        """
+        # 1. 获取玩家在新位置的碰撞箱覆盖的所有格子
+        overlapped_tiles = self.get_overlapped_tiles(new_x, new_y)
+        
+        can_move = True
+        
+        for tx, ty in overlapped_tiles:
+            # 越界检查
+            if not (0 <= tx < self.model.grid_width and 0 <= ty < self.model.grid_height):
+                return False # 撞世界边界
+            
+            val = self.model.grid[ty][tx]
+            
+            # === 🧱 阻挡判定 (墙/门/虚空) ===
+            if val == 1 or val == -1: # 墙或虚空
+                return False # 只要角碰到墙，就不能动
+            
+            if val == 8: # 门
+                # 特殊逻辑：如果是门，检查是否有钥匙
+                top_item = self._get_stack_top()
+                if top_item == 5: # 有钥匙
+                    self.model.message = "门打开了！"
+                    self.model.backpack.pop()
+                    self.model.grid[ty][tx] = 0 # 门变成了空地
+                    self.pop_sound.play()
+                    # 检查是否通关
+                    if not self.model.next_level():
+                        self.model.message = "恭喜通关！"
+                    return False 
+                else:
+                    self.model.message = "门锁着，需要钥匙！"
+                    self.error_sound.play()
+                    return False # 撞门
+
+            # === 🎒 交互判定 (道具/怪物/火) ===
+            # 这些东西也是“允许移动”的，但会触发副作用
+            if val in [3, 4, 5, 6, 7]:
+                self.handle_interaction(tx, ty, val)
+                
+        return True
+    
+    def handle_interaction(self, tx, ty, val):
+        """处理与物体的交互 (拾取/战斗)"""
+        top_item = self._get_stack_top()
+        
+        # 道具 (3水, 4剑, 5匙)
+        if val in [3, 4, 5]:
+            item_names = {3:"水", 4:"剑", 5:"钥匙"}
+            try:
+                self.model.backpack.push(val)
+                self.model.message = f"获得 {item_names[val]}"
+                self.model.grid[ty][tx] = 0 # 物品消失
+                self.push_sound.play()
+            except StructureFullError:
+                self.model.message = "背包满了！"
+                self.error_sound.play()
+        
+        # 怪物 (7)
+        elif val == 7:
+            if top_item == 4: # 剑
+                self.model.message = "击杀怪物！"
+                self.model.backpack.pop() # 消耗剑
+                self.model.grid[ty][tx] = 0 # 怪物消失
+                self.pop_sound.play()
+            else:
+                self.trigger_death("你被怪物吃掉了！")
+        
+        # 火焰 (6)
+        elif val == 6:
+            if top_item == 3: # 水
+                self.model.message = "熄灭火焰！"
+                self.model.backpack.pop()
+                self.model.grid[ty][tx] = 0
+                self.pop_sound.play()
+            else:
+                self.trigger_death("你被烧死了！")
+
+    def _get_stack_top(self):
+        """安全获取栈顶元素，如果栈为空则返回 None"""
+        try:
+            return self.model.backpack.peek()
+        except StructureEmptyError:
+            return None
+
+    def get_overlapped_tiles(self, px, py):
+        """根据玩家坐标和大小，计算出接触到的所有网格坐标"""
+        size = self.model.player_size
+        # 玩家中心在 px, py。我们需要计算左上角和右下角
+        # 假设 px, py 是格子的逻辑坐标 (比如 1.5, 2.5 是格子中心)
+        # 这里为了简单，假设 px, py 就是玩家的【中心点坐标】
+        
+        # 碰撞箱边界
+        left = px + (1 - size) / 2
+        right = left + size
+        top = py + (1 - size) / 2
+        bottom = top + size
+        
+        # 涉及到的网格索引范围
+        min_x, max_x = int(left), int(right) # right如果是 1.9，int是1。如果是2.01，int是2
+        min_y, max_y = int(top), int(bottom)
+        
+        tiles = []
+        for y in range(min_y, max_y + 1):
+            for x in range(min_x, max_x + 1):
+                tiles.append((x, y))
+        return tiles
+
         
     def reset_game(self):
         """复活：重置当前关卡"""
@@ -97,107 +242,6 @@ class GameController(QObject):
         self.refresh_view()
          # 显示复活覆盖层
         self.view.show_game_over()
-
-    def handle_input(self, key_code):
-        """处理玩家输入的移动指令"""
-        if self.model.is_game_over:
-            return
-
-        dx, dy = 0, 0
-        if key_code == Qt.Key.Key_W: dy = -1
-        elif key_code == Qt.Key.Key_S: dy = 1
-        elif key_code == Qt.Key.Key_A: dx = -1
-        elif key_code == Qt.Key.Key_D: dx = 1
-        
-        if dx == 0 and dy == 0: return
-
-        top_item = None 
-        try:
-            top_item = self.model.backpack.peek()
-        except StructureEmptyError:
-            top_item = None # 如果栈空了，就把栈顶当做 None
-
-        # 下一步的位置
-        target_x = self.model.player_x + dx
-        target_y = self.model.player_y + dy
-
-        # 1. 越界检查
-        if not (0 <= target_x < self.model.grid_width and 0 <= target_y < self.model.grid_height):
-            return 
-
-        # 获取前方是什么
-        target_val = self.model.grid[target_y][target_x]
-        
-        # 获取背包物品列表 (方便查找)
-        backpack_items = self.model.backpack.get_items()
-
-        # === 核心游戏逻辑 ===
-
-        # Case 1:  墙 (1)
-        if target_val == 1:
-            self.model.message = " 墙壁太硬了，撞不开！"
-            self.error_sound.play()
-
-        # Case 2:  门 (8) -> 通关判定
-        elif target_val == 8:
-            if top_item == 5:  # 需要 Key (5)
-                self.model.message = " 门打开了！下一层..."
-                self.model.backpack.pop()
-                self.pop_sound.play()
-                if not self.model.next_level():
-                    self.model.message = " 恭喜通关！所有关卡完成！"
-            else:
-                self.model.message = " 门锁着，你需要钥匙！"
-                self.error_sound.play()
-        # Case 3:  怪物 (7) -> 战斗判定
-        elif target_val == 7:
-            if top_item == 4:  # 需要 Sword (4)
-                self.model.message = " 你挥舞宝剑，击败了怪物！"
-                self.model.grid[target_y][target_x] = 0 # 怪物消失
-                self.model.move_player(dx, dy)
-                self.model.backpack.pop() 
-                self.pop_sound.play()
-            else:
-                self.trigger_death(" 你被怪物吃掉了！")
-                self.error_sound.play()
-
-        # Case 4:  火焰 (6) -> 消耗品判定
-        elif target_val == 6:
-            # 栈的特性：我们要找水，而且通常要消耗水
-            if top_item == 3:  # 需要 Water (3)
-                self.model.message = " 你用水浇灭了火焰！"
-                self.model.grid[target_y][target_x] = 0 # 火消失
-                self.model.move_player(dx, dy)
-                self.model.backpack.pop() 
-                self.pop_sound.play()
-            else:
-                self.trigger_death(" 你被烧焦了！")
-                self.error_sound.play()
-
-        # Case 5:  道具 (3水, 4剑, 5匙) -> 拾取逻辑
-        elif target_val in [3, 4, 5]:
-            item_names = {3:"水", 4:"剑", 5:"钥匙"}
-            try:
-                # 尝试入栈
-                self.model.backpack.push(target_val)
-                # 成功后
-                self.model.message = f"你获得了 {item_names[target_val]}"
-                self.model.grid[target_y][target_x] = 0 # 地面变空
-                self.model.move_player(dx, dy)
-                self.push_sound.play()
-            except StructureFullError:
-                # 失败后 (捕获异常)
-                self.model.message = " 背包满了！装不下！"
-                self.error_sound.play()
-
-        # Case 6: 空地 (0) -> 直接移动
-        else:
-            self.model.move_player(dx, dy)
-            self.model.message = "栈，移动！"
-            self.step_sound.play()
-
-        # 刷新界面
-        self.refresh_view()
 
     def refresh_view(self):
         """把 Model 的数据解包，喂给 View"""

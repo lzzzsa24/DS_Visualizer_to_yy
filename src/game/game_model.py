@@ -13,19 +13,23 @@ class GameModel:
         #关卡
         self.level_files=[
             "1.txt",
-            "2.txt"
+            "2.txt",
+            "3.txt",
         ]
         self.current_level_index = 0
         # 玩家背包 
         self.backpack = Stack(capacity=3)
         # 游戏消息 (用于显示在界面上)
         self.message = "欢迎来到栈之传说 - 按 WASD 移动"
+        #移动相关
+        self.player_x=0.0
+        self.player_y=0.0
+        self.move_speed=0.15  # 每次刷新移动的格子数
+        self.player_size=0.6  # 玩家碰撞箱大小（格子数）
         # 地图定义
         self.grid_width = 0
         self.grid_height = 0
         self.grid = []
-        self.player_x = 0
-        self.player_y = 0
         
         self.load_level(self.current_level_index)
 
@@ -80,8 +84,8 @@ class GameModel:
                 
                 for x, char in enumerate(padded_line):
                     if char == 'P':
-                        self.player_x = x
-                        self.player_y = y
+                        self.player_x = float(x)
+                        self.player_y = float(y)
                         val = 0
                     else:
                         # 如果遇到未知的字符，默认当做虚空(-1)
@@ -103,7 +107,7 @@ class GameModel:
         self.current_level_index += 1
         return self.load_level(self.current_level_index)
 
-    def move_player(self, dx, dy):
+    def move_player(self, dx, dy):#暂时保留
         """更新坐标"""
         self.player_x += dx
         self.player_y += dy
