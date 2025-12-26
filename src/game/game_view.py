@@ -235,13 +235,20 @@ class GameView(QWidget):
         for y in range(rows):
             for x in range(cols):
                 val = grid[y][x]
-                if val == -1:
-                    continue
+                
                 cur = self.tile_values[y][x]
                 if cur == val:
                     continue
                 self.tile_values[y][x] = val
                 item = self.tile_items[y][x]
+
+                if val == -1:
+                    # 如果新位置是虚空，但旧位置有东西，必须把它删掉！
+                    if item is not None:
+                        self.scene.removeItem(item)
+                        self.tile_items[y][x] = None
+                    continue # 处理完虚空后，跳过后续逻辑
+                
                 if val in self.skin_map:
                     char, color_code = self.skin_map[val]
                     if item is None:

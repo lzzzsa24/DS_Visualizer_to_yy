@@ -15,6 +15,9 @@ class GameModel:
             "1.txt",
             "2.txt",
             "3.txt",
+            "4.txt",
+            "5.txt"
+
         ]
         self.current_level_index = 0
         # 玩家背包 
