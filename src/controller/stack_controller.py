@@ -2,6 +2,7 @@ from PyQt6.QtWidgets import QLineEdit, QLabel, QMessageBox
 from src.model.stack import Stack
 from src.view.stack_canvas import StackCanvas
 from src.model.exceptions import StructureFullError, StructureEmptyError, StructureValueError
+from src.utils import get_base_path
 
 import os
 from PyQt6.QtCore import QUrl
@@ -25,8 +26,7 @@ class StackController:
         self.error_sound = QSoundEffect()
         self.done_sound = QSoundEffect()
 
-        current_dir = os.path.dirname(os.path.abspath(__file__)) # 获取当前文件所在目录
-        project_root = os.path.dirname(os.path.dirname(current_dir)) # 往上跳两级：src -> 根目录
+        project_root = get_base_path() # 根目录
         sounds_dir = os.path.join(project_root, 'resources', 'sounds')
 
         push_sound_path = os.path.join(sounds_dir, 'add_element_successfully.wav')

@@ -82,7 +82,7 @@ class GameView(QWidget):
             }
         """)
         self.info_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self.info_label.setText("欢迎来到栈之传说 - 按 WASD 移动")
+        self.info_label.setText("欢迎来到栈国杀 - 按 WASD 移动")
         self.info_label.adjustSize()
         # 初始居中
         self.info_label.move((self.view.width() - self.info_label.width()) // 2,0)

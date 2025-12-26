@@ -4,6 +4,7 @@ from src.game.game_view import GameView
 from src.model.exceptions import StructureFullError,StructureEmptyError
 from PyQt6.QtMultimedia import QSoundEffect
 import os,math,time
+from src.utils import get_base_path
 
 class GameController(QObject):
     def __init__(self, view: GameView):
@@ -14,8 +15,7 @@ class GameController(QObject):
         self.pop_sound = QSoundEffect()
         self.error_sound = QSoundEffect()
         self.step_sound = QSoundEffect()
-        current_dir = os.path.dirname(os.path.abspath(__file__)) # 获取当前文件所在目录
-        project_root = os.path.dirname(os.path.dirname(current_dir)) # 往上跳两级：src -> 根目录
+        project_root = get_base_path() # 根目录
         sounds_dir = os.path.join(project_root, 'resources', 'sounds')
 
         push_sound_path = os.path.join(sounds_dir, 'add_element_successfully.wav')

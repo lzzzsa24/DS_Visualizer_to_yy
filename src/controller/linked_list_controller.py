@@ -4,6 +4,7 @@ from PyQt6.QtMultimedia import QSoundEffect
 from src.model.linked_list import LinkedList
 from src.view.linked_list_canvas import LinkedListCanvas
 from src.model.exceptions import StructureEmptyError, StructureValueError
+from src.utils import get_base_path
 
 import os
 
@@ -22,8 +23,7 @@ class LinkedListController:
         self.error_sound = QSoundEffect()
         self.done_sound = QSoundEffect()
 
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.dirname(os.path.dirname(current_dir))
+        project_root = get_base_path()
         sounds_dir = os.path.join(project_root, 'resources', 'sounds')
 
         self.add_sound.setSource(QUrl.fromLocalFile(os.path.join(sounds_dir, 'add_element_successfully.wav')))

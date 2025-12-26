@@ -57,7 +57,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.linked_list_widget, "链表 (Linked List)")
         #创建game标签页
         self.game_widget = self.create_game_page()
-        self.tabs.addTab(self.game_widget, "栈之传说 (Legends of Stack)")
+        self.tabs.addTab(self.game_widget, "栈国杀 (Legends of Stack)")
         self.game_widget.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # 允许接收键盘焦点
         
         

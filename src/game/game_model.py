@@ -1,12 +1,12 @@
 from src.model.stack import Stack
 import os
 from src.model.exceptions import MapLoadError,InventoryFullError
+from src.utils import get_base_path
 
 class GameModel:
     def __init__(self):
         #定位资源路径
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.dirname(os.path.dirname(current_dir))
+        project_root = get_base_path()
         self.resources_path = os.path.join(project_root, 'resources')
         self.maps_path = os.path.join(self.resources_path, 'maps')
         self.sounds_path = os.path.join(self.resources_path, 'sounds')
@@ -23,7 +23,7 @@ class GameModel:
         # 玩家背包 
         self.backpack = Stack(capacity=3)
         # 游戏消息 (用于显示在界面上)
-        self.message = "欢迎来到栈之传说 - 按 WASD 移动"
+        self.message = "欢迎来到栈国杀 - 按 WASD 移动"
         #移动相关
         self.player_x=0.0
         self.player_y=0.0
